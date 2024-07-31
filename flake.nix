@@ -55,28 +55,18 @@
             # python313_JIT.pkgs.pip
 
             flint
+            pkgs.pkg-config
+            pkgs.ninja
           ];
 
           inputsFrom = [ flint ];
+          buildInputs = [ flint ];
 
           # shellHook = ''
           #   alias python313-JIT=${python313_JIT}/bin/python3;
           # '';
 
-          shellHook = ''
-            export PYTHON311_VENV=.venv-311
-            export PYTHON313_VENV=.venv-313
-
-            if test ! -d $PYTHON311_VENV; then
-              python3.11 -m venv $PYTHON311_VENV
-            fi
-
-            if test ! -d $PYTHON313_VENV; then
-              python3.13 -m venv $PYTHON313_VENV
-            fi
-
-            . .venv-311/bin/activate .venv-311/
-          '';
+          shellHook = '' source init-venvs.sh '';
 
         };
       };
