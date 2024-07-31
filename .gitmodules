@@ -1,0 +1,3 @@
+[submodule "python-flint"]
+	path = python-flint
+	url = https://github.com/flintlib/python-flint
