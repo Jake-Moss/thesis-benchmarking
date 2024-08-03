@@ -48,6 +48,10 @@
             python311
             python311.pkgs.pip
 
+            python311.pkgs.python-lsp-server
+            pkgs.ruff
+            python311.pkgs.python-lsp-ruff
+
             python313
             python313.pkgs.pip
 
@@ -60,14 +64,22 @@
           ];
 
           inputsFrom = [ flint ];
-          buildInputs = [ flint ];
+          buildInputs = [
+            flint
+            python311.pkgs.venvShellHook
+          ];
 
-          # shellHook = ''
+          # postShellHook = ''
           #   alias python313-JIT=${python313_JIT}/bin/python3;
           # '';
 
-          shellHook = '' source init-venvs.sh '';
+          postShellHook = '' . init-venvs.sh '';
 
+          venvDir = ".venv";
+          postVenvCreation = ''
+            unset SOURCE_DATE_EPOCH
+            pip install -e .
+          '';
         };
       };
 }

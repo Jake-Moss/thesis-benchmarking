@@ -1,16 +1,7 @@
 #/bin/env bash
 
-export HOST_VENV=.venv-host
-
-if test ! -d HOST_VENV; then
-    python3.11 -m venv $HOST_VENV
-    . $HOST_VENV/bin/activate $HOST_VENV/
-    pip install -r requirements.txt
-    deactivate
-fi
-
-export PYTHON311_VENV=.venv-311
-export PYTHON313_VENV=.venv-313
+export PYTHON311_VENV=$(readlink -f .venv-311)
+export PYTHON313_VENV=$(readlink -f .venv-313)
 
 if test ! -d $PYTHON311_VENV; then
     python3.11 -m venv $PYTHON311_VENV
