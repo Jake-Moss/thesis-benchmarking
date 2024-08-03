@@ -36,6 +36,11 @@
         CFLAGS = oldAttrs.CFLAGS or [] ++ cflags;
         configureFlags = oldAttrs.configureFlags or [] ++ [ "--enable-avx2" ];
       }));
+
+      python-host-env = python311.withPackages (ps: with ps; [
+        python-lsp-server
+        python-lsp-ruff
+      ]);
     in
       {
         packages.${system} = {
@@ -45,12 +50,11 @@
 
         devShells.${system}.default = pkgs.mkShell {
           packages = [
+            pkgs.ruff
+            python-host-env
+
             python311
             python311.pkgs.pip
-
-            python311.pkgs.python-lsp-server
-            pkgs.ruff
-            python311.pkgs.python-lsp-ruff
 
             python313
             python313.pkgs.pip
