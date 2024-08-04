@@ -1,33 +1,9 @@
 import argparse
 import logging
 import pathlib
-import itertools
 from benchmarking.harness import harnesses
-from benchmarking.runner import PythonRunner
+from benchmarking.runner import PythonRunSpec, ExternalRunSpec
 
-logger = logging.getLogger(__name__)
-
-report_format = """\
-{lib} process finished:
-\tconfig: {run_config}
-\tvenv: {venv}
-\tflags: {flags}
-\tstdout: '{stdout}'
-\tstderr: '{stderr}'
-"""
-
-python_run_config_format = """
-Running with Python libraries:
-\t{libs}
-
-Python run configuration:
-\tCPU profiling: {cpu}
-\tMemory profiling: {mem}
-\tVirtual environments: {venvs}"""
-
-external_run_config_format = """
-Running with external libraries:
-\t{libs}"""
 
 default_venvs = [pathlib.Path().parent / ".venv-311", pathlib.Path().parent / ".venv-313"]
 
@@ -103,45 +79,27 @@ def main():
             raise ValueError(f"venv is not a directory ({venv})")
         venvs.append(venv)
 
-    logger.info(
-        python_run_config_format.format(
-            libs=", ".join(python_libs),
-            cpu=args.cpu,
-            mem=args.mem,
-            venvs=[str(x.absolute()) for x in venvs],
-        )
-        if python_libs
-        else "Running with no Python libraries."
-    )
-    logger.info(
-        external_run_config_format.format(
-            libs=", ".join(external_libs),
-        )
-        if external_libs
-        else "Running with no external libraries."
+    python_run_spec = PythonRunSpec(
+        libs=python_libs,
+        venvs=venvs,
+        benchmark=args.benchmark,
+        cpu=args.cpu,
+        mem=args.mem,
+        run_list=[]
     )
 
-    for lib, venv in itertools.product(python_libs, venvs):
-        runner = PythonRunner(
-            virtual_env=venv,
-            library=lib,
-            run_list=[],
-            benchmark=args.benchmark,
-            cpu_profiling=args.cpu,
-            mem_profiling=args.mem,
-        )
+    external_run_spec = ExternalRunSpec(
+        libs=external_libs,
+        benchmark=args.benchmark,
+        run_list=[]
+    )
 
-        process = runner.run()
-        logger.info(
-            report_format.format(
-                lib=runner.library,
-                run_config=runner.run_config,
-                venv=venv,
-                stdout=process.stdout.strip(),
-                stderr=process.stderr.strip(),
-                flags=[],
-            )
-        )
+    python_run_spec.run()
+    external_run_spec.run()
+
+
+def gen_polys():
+    pass
 
 
 def from_script():
