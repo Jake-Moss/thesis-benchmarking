@@ -15,6 +15,7 @@ authors = [
 
 [project.scripts]
 benchmarking-cli = "benchmarking:cli.from_script"
+benchmarking-gen-polys = "benchmarking:cli.from_script_gen_poly"
 
 [tool.ruff]
 exclude = [
