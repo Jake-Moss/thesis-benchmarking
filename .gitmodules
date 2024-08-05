@@ -1,3 +1,6 @@
 [submodule "python-flint"]
 	path = python-flint
 	url = https://github.com/flintlib/python-flint
+[submodule "sympy"]
+	path = sympy
+	url = git@github.com:sympy/sympy.git
