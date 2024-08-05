@@ -1,1 +1,3 @@
-ID = {"python-flint": __file__}
+ID = {
+    "python-flint": {"file": __file__, "env": {}},
+}

@@ -1,3 +1,4 @@
+import os
 import abc
 import subprocess
 import pathlib
@@ -28,7 +29,8 @@ _python_run_config_format = (
     + """ with:
 \tconfig: {run_config}
 \tvenv: {venv}
-\tflags: {flags}"""
+\tflags: {flags}
+\tenv vars: {env}"""
 )
 
 _python_run_config_sum_format = """
@@ -49,8 +51,18 @@ Running with external libraries:
 class Runner(abc.ABC):
     subprocess_args = {
         "capture_output": True,
-        # "check": True,
     }
+
+    def __init__(self, library: str, flags: list[str]):
+        assert library in self.libraries
+        self.library = library
+        self.env = os.environ | self.libraries[library]["env"]
+
+        if flags is None:
+            flags = []
+
+        self.flags = flags
+
 
     @abc.abstractmethod
     def run():
@@ -75,16 +87,11 @@ class PythonRunner(Runner):
         mem_profiling: bool,
         flags: list[str] = None,
     ):
-        assert library in self.libraries
-        if flags is None:
-            flags = []
+        super().__init__(library, flags)
 
-        self.library = library
-        self.flags = flags
         self.venv = virtual_env
-
         self.script = self.script_format.format(
-            venv=virtual_env, python_flags=" ".join(flags), script=self.libraries[library]
+            venv=virtual_env, python_flags=" ".join(self.flags), script=self.libraries[library]["file"]
         )
 
         self.run_config = {
@@ -102,6 +109,7 @@ class PythonRunner(Runner):
                 run_config=self.run_config,
                 venv=self.venv,
                 flags=self.flags,
+                env=self.libraries[self.library]["env"],
             )
         )
 
@@ -137,7 +145,7 @@ class RunSpec:
     libs: list[str]
     benchmark: bool
     run_list: list[str]
-    # polys: dict[]
+    polys: dict
 
     def run(self):
         self.processes = [x.run() for x in self.runners]
@@ -170,6 +178,7 @@ class PythonRunSpec(RunSpec):
                 benchmark=self.benchmark,
                 cpu_profiling=self.cpu,
                 mem_profiling=self.mem,
+                polys=self.polys,
             )
             for lib, venv in itertools.product(self.libs, self.venvs)
         ]

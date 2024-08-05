@@ -77,7 +77,10 @@
           #   alias python313-JIT=${python313_JIT}/bin/python3;
           # '';
 
-          postShellHook = '' . init-venvs.sh '';
+          postShellHook = ''
+            . init-venvs.sh
+            export SYMPY_GROUND_TYPES=python
+          '';
 
           venvDir = ".venv";
           postVenvCreation = ''

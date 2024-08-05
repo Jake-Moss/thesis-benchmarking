@@ -1,9 +1,8 @@
-import fileinput
 import pickle
 import sys
 
 
-ID = {"dummy": __file__}
+ID = {"dummy": {"file": __file__, "env": {}}}
 
 
 def main():
