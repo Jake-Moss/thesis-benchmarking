@@ -85,7 +85,7 @@ def main():
         libs=python_libs, venvs=venvs, benchmark=args.benchmark, cpu=args.cpu, mem=args.mem, run_list=[], polys={},
     )
 
-    external_run_spec = ExternalRunSpec(libs=external_libs, benchmark=args.benchmark, run_list=[])
+    external_run_spec = ExternalRunSpec(libs=external_libs, benchmark=args.benchmark, run_list=[], polys={})
 
     python_run_spec.run()
     external_run_spec.run()
