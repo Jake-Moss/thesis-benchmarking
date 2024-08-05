@@ -1,2 +1,18 @@
 * Dummy file
 hello
+
+
+** Generate polynomials
+#+begin_src shell
+  benchmarking-gen-polys \
+      polys.pickle \
+      --generators "1-10" \
+      --sparsity "80-101:5" \
+      --coefficients "0-100,1000-10000:103" \
+      --exponents "0-10,0-100" \
+      --seed 1234 2> /dev/null
+  du -h polys.pickle
+#+end_src
+
+#+RESULTS:
+| 884K | polys.pickle |

@@ -1,7 +1,7 @@
 import argparse
 import logging
 import pathlib
-import json
+import pickle
 from benchmarking.harness import harnesses
 from benchmarking.runner import PythonRunSpec, ExternalRunSpec
 from benchmarking.gen_polys import PolynomialGenerator
@@ -82,7 +82,7 @@ def main():
         venvs.append(venv)
 
     python_run_spec = PythonRunSpec(
-        libs=python_libs, venvs=venvs, benchmark=args.benchmark, cpu=args.cpu, mem=args.mem, run_list=[]
+        libs=python_libs, venvs=venvs, benchmark=args.benchmark, cpu=args.cpu, mem=args.mem, run_list=[], polys={},
     )
 
     external_run_spec = ExternalRunSpec(libs=external_libs, benchmark=args.benchmark, run_list=[])
@@ -127,9 +127,9 @@ def gen_polys():
 
     parser.add_argument(
         "output",
-        default=pathlib.Path() / "output.json",
+        default=pathlib.Path() / "output.pickle",
         type=pathlib.Path,
-        help="json file to output the polynomials into",
+        help="pickle file to output the polynomials into",
     )
 
     parser.add_argument(
@@ -191,10 +191,10 @@ def gen_polys():
     args = parser.parse_args()
 
     if args.append:
-        with open(args.output, "r") as f:
-            existing = json.load(f)
+        with open(args.output, "rb") as f:
+            existing = pickle.load(f)
     else:
-        existing = []
+        existing = {}
 
     generator = PolynomialGenerator(
         generators=args.gens,
@@ -207,8 +207,8 @@ def gen_polys():
 
     generator.generate()
 
-    with open(args.output, "w") as f:
-        json.dump(list((dict(existing) | dict(generator.results)).items()), f)
+    with open(args.output, "wb") as f:
+        pickle.dump((existing | generator.results), f)
 
 
 def from_script():

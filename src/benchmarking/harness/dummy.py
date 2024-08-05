@@ -1,15 +1,14 @@
 import fileinput
-import json
+import pickle
+import sys
 
 
 ID = {"dummy": __file__}
 
 
 def main():
-    with fileinput.input(encoding="utf-8") as f:
-        for line in f:
-            stdin = json.loads(line)
-            print("Received:", repr(stdin))
+    stdin = pickle.load(sys.stdin.buffer)
+    print("Received:", stdin)
 
 
 if __name__ == "__main__":

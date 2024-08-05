@@ -1,7 +1,7 @@
 import abc
 import subprocess
 import pathlib
-import json
+import pickle
 import itertools
 import logging
 from dataclasses import dataclass
@@ -49,8 +49,7 @@ Running with external libraries:
 class Runner(abc.ABC):
     subprocess_args = {
         "capture_output": True,
-        "check": True,
-        "text": True,
+        # "check": True,
     }
 
     @abc.abstractmethod
@@ -70,6 +69,7 @@ class PythonRunner(Runner):
         virtual_env: pathlib.Path,
         library: str,
         run_list: dict[str, list],
+        polys: dict,
         benchmark: bool,
         cpu_profiling: bool,
         mem_profiling: bool,
@@ -92,6 +92,7 @@ class PythonRunner(Runner):
             "cpu": cpu_profiling,
             "mem": mem_profiling,
             "run_list": run_list,
+            "polys": polys,
         }
 
     def run(self):
@@ -107,7 +108,7 @@ class PythonRunner(Runner):
         self.process = subprocess.run(
             self.script,
             shell=True,
-            input=json.dumps(self.run_config),
+            input=pickle.dumps(self.run_config),
             **self.subprocess_args,
         )
 
@@ -116,8 +117,8 @@ class PythonRunner(Runner):
                 lib=self.library,
                 run_config=self.run_config,
                 venv=self.venv,
-                stdout=self.process.stdout.strip(),
-                stderr=self.process.stderr.strip(),
+                stdout=self.process.stdout.decode("utf-8").strip(),
+                stderr=self.process.stderr.decode("utf-8").strip(),
                 flags=self.flags,
             )
         )
@@ -136,6 +137,7 @@ class RunSpec:
     libs: list[str]
     benchmark: bool
     run_list: list[str]
+    # polys: dict[]
 
     def run(self):
         self.processes = [x.run() for x in self.runners]
@@ -155,7 +157,9 @@ class PythonRunSpec(RunSpec):
                 cpu=self.cpu,
                 mem=self.mem,
                 venvs=[str(x.absolute()) for x in self.venvs],
-            )  if self.libs else "Running with no Python libraries."
+            )
+            if self.libs
+            else "Running with no Python libraries."
         )
 
         self.runners = [
@@ -177,7 +181,9 @@ class ExternalRunSpec(RunSpec):
         logger.info(
             _external_run_config_sum_format.format(
                 libs=", ".join(self.libs),
-            ) if self.libs else "Running with no external libraries."
+            )
+            if self.libs
+            else "Running with no external libraries."
         )
         self.runners = []
 

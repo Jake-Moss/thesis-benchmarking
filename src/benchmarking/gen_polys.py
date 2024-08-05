@@ -32,7 +32,7 @@ class PolynomialGenerator:
         self.rng = random.Random(seed)
 
     def generate(self):
-        self.results = []
+        self.results = {}
         for gen_range, sparsity_range, coeff_range, exp_range in itertools.product(
             self.gens, self.sparity, self.coefficients, self.exponents
         ):
@@ -52,13 +52,13 @@ class PolynomialGenerator:
 
                     polys = []
                     for _ in range(self.number):
-                        poly = []
+                        poly = {}
                         for _ in range(num_terms):
                             exp_vec = tuple(
                                 self.rng.randrange(exp_range.start, exp_range.stop, exp_range.step) for _ in range(gens)
                             )
                             coeff = self.rng.randrange(coeff_range.start, coeff_range.stop, coeff_range.step)
-                            poly.append((exp_vec, coeff))
+                            poly[exp_vec] = coeff
 
                         if len(poly) != num_terms:
                             logger.warn("polynomial generated with less terms than requested")
@@ -67,29 +67,9 @@ class PolynomialGenerator:
 
                     if len(polys) != self.number:
                         logger.warn("generated less polynomials than requested")
-                    self.results.append(
-                        (
-                            (
-                                gens,
-                                sparsity,
-                                (exp_range.start, exp_range.stop, exp_range.step),
-                                (coeff_range.start, coeff_range.stop, coeff_range.step),
-                            ),
-                            polys,
-                        )
-                    )
-
-    @staticmethod
-    def parse(polys):
-        results = {}
-        for config, poly_list in polys:
-            # gens, sparsity, exp_range, coeff_range
-            config = (*config[:2], range(*config[2]), range(*config[3]))
-            res = []
-            for poly in poly_list:
-                res.append({tuple(k): v for k, v in poly})
-
-            results[config] = res
-
-        return results
-
+                    self.results[
+                        gens,
+                        sparsity,
+                        (exp_range.start, exp_range.stop, exp_range.step),
+                        (coeff_range.start, coeff_range.stop, coeff_range.step),
+                    ] = polys
