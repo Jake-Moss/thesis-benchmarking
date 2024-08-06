@@ -2,6 +2,7 @@ import argparse
 import logging
 import pathlib
 import pickle
+import pandas as pd
 from benchmarking.harness import harnesses
 from benchmarking.runner import PythonRunSpec, ExternalRunSpec
 from benchmarking.gen_polys import PolynomialGenerator
@@ -17,6 +18,13 @@ def main():
             "Benchmark SymPy and python-flint on suite of tests with CPU and memory profiles as well as Mathematica."
         ),
         epilog="No one else should ever really be using this",
+    )
+
+    parser.add_argument(
+        "polys",
+        default=pathlib.Path() / "output.pickle",
+        type=pathlib.Path,
+        help="pickled polynomials to use",
     )
 
     parser.add_argument(
@@ -46,10 +54,18 @@ def main():
     parser.add_argument(
         "--libraries",
         dest="libs",
-        default=[x for v in harnesses.values() for x in v.keys()],
+        default=[x for v in harnesses.values() for x in v.keys() if x != "dummy"],
         choices=[x for v in harnesses.values() for x in v.keys()],
         help="libraries to benchmark",
         nargs="+",
+    )
+
+    parser.add_argument(
+        "--run-list",
+        dest="run_list",
+        default=[],
+        help="methods to benchmark",
+        nargs="*",
     )
 
     parser.add_argument(
@@ -61,7 +77,20 @@ def main():
         nargs="*",
     )
 
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action='count',
+        default=0,
+    )
+
     args = parser.parse_args()
+
+    if args.verbose == 1:
+        logging.basicConfig(level=logging.INFO)
+    elif args.verbose >= 2:
+        logging.basicConfig(level=logging.DEBUG)
 
     python_libs = []
     external_libs = []
@@ -81,11 +110,25 @@ def main():
             raise ValueError(f"venv is not a directory ({venv})")
         venvs.append(venv)
 
+    with open(args.polys, "rb") as f:
+        polys = pickle.load(f)
+
     python_run_spec = PythonRunSpec(
-        libs=python_libs, venvs=venvs, benchmark=args.benchmark, cpu=args.cpu, mem=args.mem, run_list=[], polys={},
+        verbose=args.verbose,
+        libs=python_libs,
+        venvs=venvs,
+        benchmark=args.benchmark,
+        repeats=3,
+        cpu=args.cpu,
+        mem=args.mem,
+        run_list=args.run_list,
+        polys=polys,
+        gc=[True],
     )
 
-    external_run_spec = ExternalRunSpec(libs=external_libs, benchmark=args.benchmark, run_list=[], polys={})
+    external_run_spec = ExternalRunSpec(
+        verbose=args.verbose, libs=external_libs, benchmark=args.benchmark, repeats=3, run_list=[], polys={}
+    )
 
     python_run_spec.run()
     external_run_spec.run()
@@ -137,7 +180,7 @@ def gen_polys():
         dest="gens",
         type=parse_ranges,
         help="range of the number of generators to use",
-        required=True,
+        default=parse_ranges("1-10"),
     )
 
     parser.add_argument(
@@ -145,7 +188,7 @@ def gen_polys():
         dest="sparsity",
         type=parse_ranges,
         help="range of sparsities of the polynomial as an integer percentage (0 - 100) of all possible monomials",
-        required=True,
+        default=parse_ranges("50"),
     )
 
     parser.add_argument(
@@ -153,7 +196,7 @@ def gen_polys():
         dest="coefficients",
         type=parse_ranges,
         help="range of coefficients of the polynomial, sampled uniformly",
-        required=True,
+        default=parse_ranges("0-1000"),
     )
 
     parser.add_argument(
@@ -161,7 +204,7 @@ def gen_polys():
         dest="exponents",
         type=parse_ranges,
         help="range of exponents of the polynomial, sampled uniformly",
-        required=True,
+        default=parse_ranges("0-10,100-1000:101"),
     )
 
     parser.add_argument(
@@ -188,34 +231,67 @@ def gen_polys():
         help="seed provided to random.seed, default will not seed",
     )
 
-    args = parser.parse_args()
-
-    if args.append:
-        with open(args.output, "rb") as f:
-            existing = pickle.load(f)
-    else:
-        existing = {}
-
-    generator = PolynomialGenerator(
-        generators=args.gens,
-        sparsity=args.sparsity,
-        coefficients=args.coefficients,
-        exponents=args.exponents,
-        number=args.number,
-        seed=args.seed,
+    parser.add_argument(
+        "--describe",
+        dest="describe",
+        action="store_true",
+        default=False,
     )
 
-    generator.generate()
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action='count',
+        default=0,
+    )
 
-    with open(args.output, "wb") as f:
-        pickle.dump((existing | generator.results), f)
+    args = parser.parse_args()
+
+    if args.verbose == 1:
+        logging.basicConfig(level=logging.INFO)
+    elif args.verbose >= 2:
+        logging.basicConfig(level=logging.DEBUG)
+
+    if args.describe:
+        with open(args.output, "rb") as f:
+            existing = pickle.load(f)
+
+        flattened_data = [(*k, v) for k, values in existing.items() for v in values]
+        df = pd.DataFrame(flattened_data, columns=["generators", "sparsity", "exp_range", "coeff_range", "poly"])
+        df["exp_range"] = df["exp_range"].apply(lambda x: (x.start, x.stop, x.step)).astype("category")
+        df["coeff_range"] = df["coeff_range"].apply(lambda x: (x.start, x.stop, x.step)).astype("category")
+        df["len"] = df["poly"].apply(len)
+        print(df.to_string(max_rows=10, max_colwidth=20))
+        print()
+        print("Min len:", df["len"].min())
+        print("Max len:", df["len"].max())
+
+    else:
+        if args.append:
+            with open(args.output, "rb") as f:
+                existing = pickle.load(f)
+        else:
+            existing = {}
+
+        generator = PolynomialGenerator(
+            generators=args.gens,
+            sparsity=args.sparsity,
+            coefficients=args.coefficients,
+            exponents=args.exponents,
+            number=args.number,
+            seed=args.seed,
+        )
+
+        generator.generate()
+
+        with open(args.output, "wb") as f:
+            pickle.dump((existing | generator.results), f)
 
 
 def from_script():
-    logging.basicConfig(level=logging.INFO)
     main()
 
 
 def from_script_gen_poly():
-    logging.basicConfig(level=logging.INFO)
     gen_polys()

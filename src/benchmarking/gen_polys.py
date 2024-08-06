@@ -67,9 +67,4 @@ class PolynomialGenerator:
 
                     if len(polys) != self.number:
                         logger.warn("generated less polynomials than requested")
-                    self.results[
-                        gens,
-                        sparsity,
-                        (exp_range.start, exp_range.stop, exp_range.step),
-                        (coeff_range.start, coeff_range.stop, coeff_range.step),
-                    ] = polys
+                    self.results[gens, sparsity, exp_range, coeff_range] = polys

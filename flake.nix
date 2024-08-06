@@ -36,11 +36,6 @@
         CFLAGS = oldAttrs.CFLAGS or [] ++ cflags;
         configureFlags = oldAttrs.configureFlags or [] ++ [ "--enable-avx2" ];
       }));
-
-      python-host-env = python311.withPackages (ps: with ps; [
-        python-lsp-server
-        python-lsp-ruff
-      ]);
     in
       {
         packages.${system} = {
@@ -51,7 +46,6 @@
         devShells.${system}.default = pkgs.mkShell {
           packages = [
             pkgs.ruff
-            python-host-env
 
             python311
             python311.pkgs.pip
@@ -62,9 +56,19 @@
             # python313_JIT
             # python313_JIT.pkgs.pip
 
+            (python311.withPackages (python-pkgs: [
+              python-pkgs.python-lsp-server
+              python-pkgs.python-lsp-ruff
+              python-pkgs.pandas
+            ]))
+
             flint
             pkgs.pkg-config
             pkgs.ninja
+
+            # pkgs.gcc
+            # pkgs.glibc
+            # pkgs.zlib
           ];
 
           inputsFrom = [ flint ];
@@ -73,11 +77,16 @@
             python311.pkgs.venvShellHook
           ];
 
+          # nativeBuildInputs = [
+          #   pkgs.gcc
+          # ];
+
           # postShellHook = ''
           #   alias python313-JIT=${python313_JIT}/bin/python3;
           # '';
 
           postShellHook = ''
+            unset SOURCE_DATE_EPOCH
             . init-venvs.sh
             export SYMPY_GROUND_TYPES=python
           '';
@@ -85,7 +94,9 @@
           venvDir = ".venv";
           postVenvCreation = ''
             unset SOURCE_DATE_EPOCH
+            pip install pandas numpy --prefer-binary
             pip install -e .
+            fix-python --venv .venv
           '';
         };
       };

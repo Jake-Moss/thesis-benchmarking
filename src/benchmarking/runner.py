@@ -5,6 +5,7 @@ import pathlib
 import pickle
 import itertools
 import logging
+import tempfile
 from dataclasses import dataclass
 
 from benchmarking.harness import harnesses
@@ -21,7 +22,7 @@ Running {lib}."""
 
 _report_format = """\
 {lib} process finished:
-\tstdout: '{stdout}'
+\tstdout (unpickled): {stdout!s}
 \tstderr: '{stderr}'"""
 
 _python_run_config_format = (
@@ -41,7 +42,8 @@ Python run configuration:
 \tBenchmarking?: {benchmark}
 \tCPU profiling?: {cpu}
 \tMemory profiling?: {mem}
-\tVirtual environments: {venvs}"""
+\tVirtual environments: {venvs}
+\tGarbage collection?: {gc}"""
 
 _external_run_config_sum_format = """
 Running with external libraries:
@@ -53,7 +55,7 @@ class Runner(abc.ABC):
         "capture_output": True,
     }
 
-    def __init__(self, library: str, flags: list[str]):
+    def __init__(self, library: str, flags: list[str], verbose):
         assert library in self.libraries
         self.library = library
         self.env = os.environ | self.libraries[library]["env"]
@@ -62,7 +64,7 @@ class Runner(abc.ABC):
             flags = []
 
         self.flags = flags
-
+        self.log_file = tempfile.NamedTemporaryFile(delete=False) if verbose else None
 
     @abc.abstractmethod
     def run():
@@ -85,9 +87,12 @@ class PythonRunner(Runner):
         benchmark: bool,
         cpu_profiling: bool,
         mem_profiling: bool,
+        gc: bool,
+        repeats: int,
         flags: list[str] = None,
+        verbose: bool = False,
     ):
-        super().__init__(library, flags)
+        super().__init__(library, flags, verbose)
 
         self.venv = virtual_env
         self.script = self.script_format.format(
@@ -100,13 +105,16 @@ class PythonRunner(Runner):
             "mem": mem_profiling,
             "run_list": run_list,
             "polys": polys,
+            "gc": gc,
+            "repeats": repeats,
+            "log_file": self.log_file.name if self.log_file is not None else None,
         }
 
     def run(self):
         logger.info(
             self.run_config_format.format(
                 lib=self.library,
-                run_config=self.run_config,
+                run_config={k: v for k, v in self.run_config.items() if k != "polys"},
                 venv=self.venv,
                 flags=self.flags,
                 env=self.libraries[self.library]["env"],
@@ -120,12 +128,14 @@ class PythonRunner(Runner):
             **self.subprocess_args,
         )
 
-        logger.info(
+        self.stdout = pickle.loads(self.process.stdout) if self.process.stdout else None
+
+        logger.debug(
             self.report_format.format(
                 lib=self.library,
                 run_config=self.run_config,
                 venv=self.venv,
-                stdout=self.process.stdout.decode("utf-8").strip(),
+                stdout=self.stdout,
                 stderr=self.process.stderr.decode("utf-8").strip(),
                 flags=self.flags,
             )
@@ -142,8 +152,10 @@ class MathematicaRunner(Runner):
 
 @dataclass
 class RunSpec:
+    verbose: bool
     libs: list[str]
     benchmark: bool
+    repeats: int
     run_list: list[str]
     polys: dict
 
@@ -156,8 +168,10 @@ class PythonRunSpec(RunSpec):
     venvs: list[pathlib.Path]
     cpu: bool
     mem: bool
+    gc: list[bool]
 
     def __post_init__(self):
+        assert 0 < len(self.gc) <= 2
         logger.info(
             _python_run_config_sum_format.format(
                 libs=", ".join(self.libs),
@@ -165,6 +179,7 @@ class PythonRunSpec(RunSpec):
                 cpu=self.cpu,
                 mem=self.mem,
                 venvs=[str(x.absolute()) for x in self.venvs],
+                gc=self.gc if len(self.gc) == 2 else self.gc[0],
             )
             if self.libs
             else "Running with no Python libraries."
@@ -179,8 +194,11 @@ class PythonRunSpec(RunSpec):
                 cpu_profiling=self.cpu,
                 mem_profiling=self.mem,
                 polys=self.polys,
+                gc=gc,
+                repeats=self.repeats,
+                verbose=self.verbose,
             )
-            for lib, venv in itertools.product(self.libs, self.venvs)
+            for lib, venv, gc in itertools.product(self.libs, self.venvs, self.gc)
         ]
 
 

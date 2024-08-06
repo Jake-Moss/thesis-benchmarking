@@ -9,7 +9,9 @@ if test ! -d $PYTHON311_VENV; then
     pip install ./python-flint/
     pip install ./sympy/
     pip install gmpy2==2.2.1
+    pip install -e .
     deactivate
+    fix-python --venv $PYTHON311_VENV
 fi
 
 if test ! -d $PYTHON313_VENV; then
@@ -18,5 +20,7 @@ if test ! -d $PYTHON313_VENV; then
     pip install ./python-flint/
     pip install ./sympy/
     pip install gmpy2==2.2.1
+    pip install -e .
     deactivate
+    fix-python --venv $PYTHON313_VENV
 fi

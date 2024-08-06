@@ -3,16 +3,66 @@ hello
 
 
 ** Generate polynomials
-#+begin_src shell
+#+begin_src shell :results verbatim
   benchmarking-gen-polys \
       polys.pickle \
       --generators "1-10" \
-      --sparsity "80-101:5" \
+      --sparsity "80-99:5" \
       --coefficients "0-100,1000-10000:103" \
       --exponents "0-10,0-100" \
       --seed 1234 2> /dev/null
-  du -h polys.pickle
+
+  benchmarking-gen-polys polys.pickle --describe
 #+end_src
 
 #+RESULTS:
-| 884K | polys.pickle |
+#+begin_example
+      generators  sparsity    exp_range         coeff_range                 poly  len
+0              1        80   (0, 10, 1)         (0, 100, 1)  {(7,): 14, (0,):...    2
+1              1        80   (0, 10, 1)         (0, 100, 1)  {(9,): 4, (1,): 12}    2
+2              1        80   (0, 10, 1)         (0, 100, 1)  {(5,): 30, (0,): 3}    2
+3              1        80   (0, 10, 1)         (0, 100, 1)  {(0,): 44, (9,):...    2
+4              1        80   (0, 10, 1)         (0, 100, 1)  {(9,): 59, (2,):...    2
+...          ...       ...          ...                 ...                  ...  ...
+1435           9        95  (0, 100, 1)  (1000, 10000, 103)  {(33, 89, 36, 8,...   45
+1436           9        95  (0, 100, 1)  (1000, 10000, 103)  {(72, 64, 19, 77...   45
+1437           9        95  (0, 100, 1)  (1000, 10000, 103)  {(29, 77, 43, 6,...   45
+1438           9        95  (0, 100, 1)  (1000, 10000, 103)  {(30, 40, 15, 27...   45
+1439           9        95  (0, 100, 1)  (1000, 10000, 103)  {(67, 95, 65, 68...   45
+
+Min len: 0
+Max len: 180
+#+end_example
+
+#+begin_src shell :results verbatim
+  benchmarking-gen-polys \
+      polys.pickle \
+      --generators "1-2" \
+      --sparsity "80-99:5" \
+      --coefficients "0-100" \
+      --exponents "0-10" \
+      --number 3 \
+      --seed 1234 2> /dev/null
+
+  benchmarking-gen-polys polys.pickle --describe
+#+end_src
+
+#+RESULTS:
+#+begin_example
+    generators  sparsity   exp_range  coeff_range                 poly  len
+0            1        80  (0, 10, 1)  (0, 100, 1)  {(7,): 14, (0,):...    2
+1            1        80  (0, 10, 1)  (0, 100, 1)  {(9,): 4, (1,): 12}    2
+2            1        80  (0, 10, 1)  (0, 100, 1)  {(5,): 30, (0,): 3}    2
+3            1        85  (0, 10, 1)  (0, 100, 1)           {(0,): 44}    1
+4            1        85  (0, 10, 1)  (0, 100, 1)           {(9,): 61}    1
+..         ...       ...         ...          ...                  ...  ...
+7            1        90  (0, 10, 1)  (0, 100, 1)           {(2,): 91}    1
+8            1        90  (0, 10, 1)  (0, 100, 1)            {(1,): 1}    1
+9            1        95  (0, 10, 1)  (0, 100, 1)                   {}    0
+10           1        95  (0, 10, 1)  (0, 100, 1)                   {}    0
+11           1        95  (0, 10, 1)  (0, 100, 1)                   {}    0
+
+Min len: 0
+Max len: 2
+#+end_example
+
