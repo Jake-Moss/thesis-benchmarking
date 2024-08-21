@@ -1,6 +1,6 @@
-[submodule "python-flint"]
-	path = python-flint
-	url = https://github.com/flintlib/python-flint
-[submodule "sympy"]
-	path = sympy
-	url = git@github.com:sympy/sympy.git
+[submodule "libs/python-flint"]
+	path = libs/python-flint
+	url = git@github.com:Jake-Moss/python-flint.git
+[submodule "libs/sympy"]
+	path = libs/sympy
+	url = git@github.com:Jake-Moss/sympy.git
