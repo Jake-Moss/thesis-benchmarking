@@ -17,6 +17,11 @@ _script_format = r"""\
 set -euo pipefail
 {venv}/bin/python {python_flags} {script}"""
 
+_perf_script_format = r"""\
+. {venv}/bin/activate {venv}/
+set -euo pipefail
+samply record --save-only -o {output} -- {venv}/bin/python {python_flags} {script}"""
+
 _external_run_config_format = """\
 Running {lib}."""
 
@@ -43,7 +48,8 @@ Python run configuration:
 \tCPU profiling?: {cpu}
 \tMemory profiling?: {mem}
 \tVirtual environments: {venvs}
-\tGarbage collection?: {gc}"""
+\tGarbage collection?: {gc}
+\tInterpreter flags: {flags}"""
 
 _external_run_config_sum_format = """
 Running with external libraries:
@@ -61,7 +67,7 @@ class Runner(abc.ABC):
         self.env = os.environ | self.libraries[library]["env"]
 
         if flags is None:
-            flags = []
+            flags = tuple()
 
         self.flags = flags
         self.log_file = tempfile.NamedTemporaryFile(delete=False) if verbose else None
@@ -70,10 +76,16 @@ class Runner(abc.ABC):
     def run():
         pass
 
+    def dump_dict(self):
+        return {
+            "library": self.library,
+            "flags": self.flags,
+            "gc": self.run_config["gc"],
+        }
+
 
 class PythonRunner(Runner):
     libraries = harnesses["python"]
-    script_format = _script_format
     run_config_format = _python_run_config_format
     report_format = _report_format
 
@@ -82,7 +94,7 @@ class PythonRunner(Runner):
         *,
         virtual_env: pathlib.Path,
         library: str,
-        run_list: dict[str, list],
+        run_list: list[str],
         polys: dict,
         benchmark: bool,
         cpu_profiling: bool,
@@ -95,9 +107,19 @@ class PythonRunner(Runner):
         super().__init__(library, flags, verbose)
 
         self.venv = virtual_env
-        self.script = self.script_format.format(
-            venv=virtual_env, python_flags=" ".join(self.flags), script=self.libraries[library]["file"]
-        )
+        if cpu_profiling:
+            self.samply_file = tempfile.NamedTemporaryFile(delete=False) if verbose else None
+            self.script = _perf_script_format.format(
+                venv=virtual_env,
+                python_flags=" ".join(self.flags),
+                script=self.libraries[library]["file"],
+                output=self.samply_file.name,
+            )
+        else:
+            self.samply_file = None
+            self.script = _script_format.format(
+                venv=virtual_env, python_flags=" ".join(self.flags), script=self.libraries[library]["file"]
+            )
 
         self.run_config = {
             "benchmark": benchmark,
@@ -125,10 +147,14 @@ class PythonRunner(Runner):
             self.script,
             shell=True,
             input=pickle.dumps(self.run_config),
+            env=self.env,
             **self.subprocess_args,
         )
 
         self.stdout = pickle.loads(self.process.stdout) if self.process.stdout else None
+
+        if self.samply_file is not None:
+            self.stdout["samply_file"] = self.samply_file.name
 
         logger.debug(
             self.report_format.format(
@@ -142,6 +168,12 @@ class PythonRunner(Runner):
         )
 
         return self.process
+
+    def dump_dict(self):
+        return super().dump_dict() | {
+            "stdout": self.stdout,
+            "venv": self.venv,
+        }
 
 
 class MathematicaRunner(Runner):
@@ -169,6 +201,7 @@ class PythonRunSpec(RunSpec):
     cpu: bool
     mem: bool
     gc: list[bool]
+    flags: list[str]
 
     def __post_init__(self):
         assert 0 < len(self.gc) <= 2
@@ -179,7 +212,8 @@ class PythonRunSpec(RunSpec):
                 cpu=self.cpu,
                 mem=self.mem,
                 venvs=[str(x.absolute()) for x in self.venvs],
-                gc=self.gc if len(self.gc) == 2 else self.gc[0],
+                gc=self.gc,
+                flags=self.flags,
             )
             if self.libs
             else "Running with no Python libraries."
@@ -197,6 +231,7 @@ class PythonRunSpec(RunSpec):
                 gc=gc,
                 repeats=self.repeats,
                 verbose=self.verbose,
+                flags=self.flags,
             )
             for lib, venv, gc in itertools.product(self.libs, self.venvs, self.gc)
         ]

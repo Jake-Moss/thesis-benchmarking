@@ -3,9 +3,13 @@ import logging
 import pathlib
 import pickle
 import pandas as pd
+import sys
+sys.path.insert(0, str((pathlib.Path() / "src").absolute()))
+
 from benchmarking.harness import harnesses
 from benchmarking.runner import PythonRunSpec, ExternalRunSpec
 from benchmarking.gen_polys import PolynomialGenerator
+
 
 
 default_venvs = [pathlib.Path().parent / ".venv-311", pathlib.Path().parent / ".venv-313"]
@@ -22,9 +26,23 @@ def main():
 
     parser.add_argument(
         "polys",
-        default=pathlib.Path() / "output.pickle",
+        default=pathlib.Path() / "polys.pickle",
         type=pathlib.Path,
         help="pickled polynomials to use",
+    )
+
+    parser.add_argument(
+        "run_list",
+        default=pathlib.Path() / "run_list.pickle",
+        type=pathlib.Path,
+        help="pickled run list, function name to polynomial key",
+    )
+
+    parser.add_argument(
+        "output",
+        default=pathlib.Path() / "results.pickle",
+        type=pathlib.Path,
+        help="pickle file to output the results into",
     )
 
     parser.add_argument(
@@ -58,14 +76,6 @@ def main():
         choices=[x for v in harnesses.values() for x in v.keys()],
         help="libraries to benchmark",
         nargs="+",
-    )
-
-    parser.add_argument(
-        "--run-list",
-        dest="run_list",
-        default=[],
-        help="methods to benchmark",
-        nargs="*",
     )
 
     parser.add_argument(
@@ -113,25 +123,35 @@ def main():
     with open(args.polys, "rb") as f:
         polys = pickle.load(f)
 
+    with open(args.run_list, "rb") as f:
+        run_list = pickle.load(f)
+
     python_run_spec = PythonRunSpec(
         verbose=args.verbose,
         libs=python_libs,
         venvs=venvs,
         benchmark=args.benchmark,
-        repeats=3,
+        repeats=1,
         cpu=args.cpu,
         mem=args.mem,
-        run_list=args.run_list,
+        run_list=run_list,
         polys=polys,
         gc=[True],
+        flags=[],  # ["-X", "perf"],
     )
 
     external_run_spec = ExternalRunSpec(
-        verbose=args.verbose, libs=external_libs, benchmark=args.benchmark, repeats=3, run_list=[], polys={}
+        verbose=args.verbose, libs=external_libs, benchmark=args.benchmark, repeats=3, run_list=run_list, polys={}
     )
 
+    res = {}
     python_run_spec.run()
+    res["python"] = [x.dump_dict() for x in python_run_spec.runners]
     external_run_spec.run()
+    res["external"] = [x.dump_dict() for x in python_run_spec.runners]
+
+    with open(args.output, "wb") as f:
+        pickle.dump(res, f)
 
 
 def parse_ranges(range_str):

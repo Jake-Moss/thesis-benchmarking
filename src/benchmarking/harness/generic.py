@@ -1,21 +1,24 @@
 import cProfile
-import tracemalloc  # NOTE: check that this import doesn't slow things down
 import timeit
 import abc
 import tempfile
 import gc
+# import memray
+import logging
+import pickle
 import sys
 
 
-class Base(abc.ABC):
+logger = logging.getLogger(__name__)
+
+
+class Base:
     def __init__(self, repeats: int = 3, gc: bool = False):
         self.results = {}
         self.gc = gc
 
-    @abc.abstractmethod
     def execute(name, func, repeats: int):
         pass
-
 
 class Benchmark(Base):
     def __init__(self, *args, **kwargs):
@@ -31,49 +34,92 @@ class CPUProfile(Base):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def execute(self, name, func, repeats: int):
-        pr = cProfile.Profile()
+    def execute(self, name, func, **_):
+        # pr = cProfile.Profile()
 
         try:
             if not self.gc:
                 gc.disable()
-            pr.enable()
-            for _ in range(repeats):
-                func()
-            pr.disable()
+            sys.activate_stack_trampoline("perf")
+            func()
         finally:
+            sys.deactivate_stack_trampoline()
             if not self.gc:
                 gc.enable()
 
-        f = tempfile.NamedTemporaryFile(suffix=".prof", delete=False)
-        pr.dump_stats(f.name)
+        # f = tempfile.NamedTemporaryFile(suffix=".prof", delete=False)
+        # pr.dump_stats(f.name)
 
-        self.results[name] = f.name
+        # self.results[name] = f.name
 
 
 class MemoryProfile(Base):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # tracemalloc.start(65535)
 
-    def execute(self, name, func, repeats: int):
-
+    def execute(self, name, func, **_):
+        f = tempfile.NamedTemporaryFile(suffix=".memray", delete=False)
         try:
             if not self.gc:
                 gc.disable()
-            # tracemalloc.clear_traces()
-            tracemalloc.start(1000)
 
-            for _ in range(repeats):
+            with memray.Tracker(destination=memray.FileDestination(f.name, overwrite=True)):
                 func()
         finally:
-            snapshot = tracemalloc.take_snapshot()
-            tracemalloc.stop()
             if not self.gc:
                 gc.enable()
 
-        f = tempfile.NamedTemporaryFile(suffix=".tracemalloc", delete=False)
-        snapshot.dump(f.name)
-        print(f.name, file=sys.stderr)
-        print(*snapshot.statistics("traceback")[:10], sep="\n", file=sys.stderr)
         self.results[name] = f.name
+
+
+class Library(abc.ABC):
+    def __init__(self, profilers: dict):
+        self.profilers = profilers
+        self.poly_dict = {}
+
+    def run(self, run_list, repeats):
+        self.results = {}
+        for profiler_name, profiler in self.profilers.items():
+            for name, poly_keys in run_list.items():
+                for poly_key in poly_keys:
+                    args = tuple(self.poly_dict[k] for k in poly_key)
+                    logger.debug(f"running {type(profiler).__name__} on {name} with arguments {poly_key}")
+
+                    func = getattr(self, name)
+                    def foo(func=func, args=args):
+                        return func(*args)
+
+                    profiler.execute((name, poly_key), foo, repeats=repeats)
+
+            self.results[profiler_name] = profiler.results
+
+    @abc.abstractmethod
+    def parse_polys(self, polys_collection: dict):
+        pass
+
+    @classmethod
+    def main(cls):
+        stdin = pickle.load(sys.stdin.buffer)
+        print("Received:", {k: v if k != "polys" else "..." for k, v in stdin.items()}, file=sys.stderr)
+
+        repeats = stdin["repeats"]
+        gc_enabled = stdin["gc"]
+
+        if stdin["log_file"] is not None:
+            logging.basicConfig(filename=stdin["log_file"], encoding="utf-8", level=logging.DEBUG)
+
+        profilers = {}
+        if stdin["benchmark"]:
+            profilers["benchmark"] = Benchmark(repeats, gc_enabled)
+
+        if stdin["cpu"]:
+            profilers["cpu"] = CPUProfile(repeats, gc_enabled)
+
+        # if stdin["mem"]:
+        #     profilers["mem"] = MemoryProfile(repeats, gc_enabled)
+
+        d = cls(profilers)
+        d.parse_polys(stdin["polys"])
+        d.run(stdin["run_list"], repeats)
+        pickle.dump(d.results, sys.stdout.buffer)
+
