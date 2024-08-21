@@ -1,0 +1,118 @@
+4
+ 8*H1 - 0.51234*H1*(1  +(1/2)*H1+(1/3)*H2+(1/4)*H3) - 8;
+ 8*H2 - 0.51234*H2*(1/2+(1/3)*H1+(1/4)*H2+(1/5)*H3) - 8;
+ 8*H3 - 0.51234*H3*(1/3+(1/4)*H1+(1/5)*H2+(1/6)*H3) - 8;
+ 8*H4 - 0.51234*H4*(1/4+(1/5)*H1+(1/6)*H2+(1/7)*H3) - 8;
+
+TITLE : The Chandrasekhar H-Equation for n=4
+
+ROOT COUNTS :
+
+total degree : 16
+2-homogeneous Bezout number : 8
+  with partition : {H1 H2 H3 }{H4 }
+generalized Bezout number : 8
+  based on the set structure :
+     {H1 }{H1 H2 H3 }
+     {H1 H2 }{H2 H3 }
+     {H1 H2 H3 }{H3 }
+     {H1 H2 H3 }{H4 }
+mixed volume : 8
+
+REFERENCES :
+
+Laureano Gonzalez-Vega: "Some examples on problem solving by using the
+  symbolic viewpoint when dealing with polynomial systems of equations".
+  in: "Computer Algebra in Science and Engineering", Editors: J. Fleischer,
+  J. Grabmeier, F.W. Hehl and W. Kuechlin.  Pages 102-116
+  World Scientific Publishing, 1995.
+
+S. Chandrasekhar: "Radiative Transfer", Dover, NY, 1960.
+
+C.T. Kelley: "Solution of the Chandrasekhar H-equation by Newton's method".
+  J. Math. Phys., 21 (1980), pp. 1625-1628.
+
+Jorge J. More': "A collection of nonlinear model problems"
+  in: "Computational Solution of Nonlinear Systems of Equations",
+  Editors: Eugene L. Allgower and Kurt Georg.  Pages 723-762.
+  Lectures in Applied Mathematics, Volume 26, AMS, 1990.
+
+NOTE : the parameter c equals 0.51234.
+  In general c can be any number in the interval (0,1]
+
+THE SOLUTIONS :
+
+8 4
+===========================================================================
+solution : 1 :         start residual :  9.326E-15
+t :  1.00000000000000E+00   0.00000000000000E+00
+m : 1
+the solution for t :
+ H1 :  2.51822165029661E+01  -2.80259692864963E-45
+ H2 :  2.76663658872307E+00   4.20389539297445E-45
+ H3 :  1.92497869539309E+00   7.88230386182710E-46
+ H4 :  1.62786627049800E+00   5.64017369306435E-47
+== err :  5.821E-15 = rco :  3.032E-01 = res :  9.326E-15 = real regular ==
+solution : 2 :         start residual :  1.421E-14
+t :  1.00000000000000E+00   0.00000000000000E+00
+m : 1
+the solution for t :
+ H1 : -3.16331327268600E+00  -5.98699295060652E-49
+ H2 :  5.98637030800302E+01   3.42113882891801E-49
+ H3 :  4.71153264168264E+00   1.71056941445901E-48
+ H4 :  2.92029637979939E+00   0.00000000000000E+00
+== err :  9.192E-15 = rco :  8.707E-02 = res :  1.421E-14 = real regular ==
+solution : 3 :         start residual :  1.954E-14
+t :  1.00000000000000E+00   0.00000000000000E+00
+m : 1
+the solution for t :
+ H1 : -2.04390936597088E+00  -1.71056941445901E-48
+ H2 : -5.35792480577045E+00   1.64214663788065E-47
+ H3 :  1.00248604763324E+02  -2.46321995682097E-47
+ H4 :  6.65820570096541E+00   2.73691106313441E-47
+== err :  2.697E-14 = rco :  4.618E-02 = res :  1.954E-14 = real regular ==
+solution : 4 :         start residual :  1.878E-13
+t :  1.00000000000000E+00   0.00000000000000E+00
+m : 1
+the solution for t :
+ H1 : -9.16750879611222E+01   1.96715482662786E-48
+ H2 :  1.74858343204201E+02  -1.81320357932655E-47
+ H3 :  9.34554507528133E+00   2.01847190906163E-47
+ H4 :  4.84698612466881E+00   4.27642353614751E-49
+== err :  2.920E-13 = rco :  8.642E-03 = res :  1.878E-13 = real regular ==
+solution : 5 :         start residual :  4.547E-12
+t :  1.00000000000000E+00   0.00000000000000E+00
+m : 1
+the solution for t :
+ H1 :  1.60786418589275E+02  -2.11876327805912E-42
+ H2 : -8.54279410691036E+02   1.00893489431387E-41
+ H3 :  8.75536444248736E+02  -8.87862706996204E-42
+ H4 :  3.05801024813143E+01  -1.74882048347737E-42
+== err :  1.468E-11 = rco :  6.658E-04 = res :  4.547E-12 = real regular ==
+solution : 6 :         start residual :  5.684E-14
+t :  1.00000000000000E+00   0.00000000000000E+00
+m : 1
+the solution for t :
+ H1 : -5.92339596991102E+01  -2.72636629219036E-41
+ H2 : -1.56501821027881E+01   1.14794370197489E-41
+ H3 :  1.98847790262814E+02   3.44383110592467E-41
+ H4 :  1.10510121065134E+01   1.82953527502248E-41
+== err :  1.867E-13 = rco :  7.146E-03 = res :  5.684E-14 = real regular ==
+solution : 7 :         start residual :  6.537E-13
+t :  1.00000000000000E+00   0.00000000000000E+00
+m : 1
+the solution for t :
+ H1 :  7.44078945107443E+00   7.33159356534744E-42
+ H2 : -3.38634231314829E+02  -3.71288041107504E-41
+ H3 :  4.86695180986615E+02   3.39002124489460E-41
+ H4 :  1.98248659810970E+01  -5.42582765386569E-42
+== err :  5.111E-12 = rco :  1.675E-03 = res :  6.537E-13 = real regular ==
+solution : 8 :         start residual :  2.012E-16
+t :  1.00000000000000E+00   0.00000000000000E+00
+m : 1
+the solution for t :
+ H1 :  1.16536939222831E+00  -1.40129846432482E-45
+ H2 :  1.09668785507998E+00   7.00649232162409E-46
+ H3 :  1.07006151566156E+00   2.62743462060903E-46
+ H4 :  1.05533428697623E+00   8.75811540203011E-47
+== err :  2.221E-16 = rco :  8.839E-01 = res :  2.012E-16 = real regular ==
