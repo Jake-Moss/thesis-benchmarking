@@ -96,9 +96,7 @@ class PythonRunner(Runner):
         library: str,
         run_list: list[str],
         polys: dict,
-        benchmark: bool,
-        cpu_profiling: bool,
-        mem_profiling: bool,
+        type: str,
         gc: bool,
         repeats: int,
         flags: list[str] = None,
@@ -107,7 +105,7 @@ class PythonRunner(Runner):
         super().__init__(library, flags, verbose)
 
         self.venv = virtual_env
-        if cpu_profiling:
+        if type == "cpu":
             self.samply_file = tempfile.NamedTemporaryFile(delete=False) if verbose else None
             self.script = _perf_script_format.format(
                 venv=virtual_env,
@@ -122,9 +120,7 @@ class PythonRunner(Runner):
             )
 
         self.run_config = {
-            "benchmark": benchmark,
-            "cpu": cpu_profiling,
-            "mem": mem_profiling,
+            "type": type,
             "run_list": run_list,
             "polys": polys,
             "gc": gc,
@@ -153,7 +149,7 @@ class PythonRunner(Runner):
 
         self.stdout = pickle.loads(self.process.stdout) if self.process.stdout else None
 
-        if self.samply_file is not None:
+        if self.samply_file is not None and self.stdout is not None:
             self.stdout["samply_file"] = self.samply_file.name
 
         logger.debug(
@@ -219,21 +215,25 @@ class PythonRunSpec(RunSpec):
             else "Running with no Python libraries."
         )
 
+        types = (
+            (["benchmark"] if self.benchmark else []) +
+            (["cpu"] if self.cpu else []) +
+            (["mem"] if self.mem else [])
+        )
+
         self.runners = [
             PythonRunner(
                 virtual_env=venv,
                 library=lib,
                 run_list=self.run_list,
-                benchmark=self.benchmark,
-                cpu_profiling=self.cpu,
-                mem_profiling=self.mem,
+                type=type,
                 polys=self.polys,
                 gc=gc,
                 repeats=self.repeats,
                 verbose=self.verbose,
                 flags=self.flags,
             )
-            for lib, venv, gc in itertools.product(self.libs, self.venvs, self.gc)
+            for lib, venv, gc, type in itertools.product(self.libs, self.venvs, self.gc, types)
         ]
 
 

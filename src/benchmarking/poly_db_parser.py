@@ -75,7 +75,7 @@ polys = pd.DataFrame(polys, columns=["name", "generators", "system"]).set_index(
 df = polys.join([descriptions, stats, timings], how="left").sort_values("total")
 
 # NOTE
-df = df[df["total"] < pd.Timedelta(10, "s")]
+# df = df[df["total"] < pd.Timedelta(10, "s")]
 
 gens_dict = df["generators"].apply(lambda gens: [str(x) for x in gens]).to_dict()
 polys_dict = df["system"].apply(

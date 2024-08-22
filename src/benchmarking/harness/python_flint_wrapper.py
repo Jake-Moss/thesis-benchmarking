@@ -1,4 +1,5 @@
 from benchmarking.harness.generic import Library
+import sys
 
 
 ID = {
@@ -10,14 +11,12 @@ class PythonFlint(Library):
     def parse_polys(self, polys_collection: dict):
         self.poly_dict = {}
         for k, (gens, polys) in polys_collection.items():
-            ctx = flint.fmpz_mpoly_ctx.get_context(len(gens), flint.Ordering.lex, nametup=gens)
-            res = []
-            for poly in polys:
-                if isinstance(poly, dict):
-                    poly = ctx.from_dict(poly)
-                else:
-                    poly = flint.fmpz_mpoly_vec([ctx.from_dict(p) for p in polys], ctx)
-                res.append(poly)
+            ctx = flint.fmpz_mpoly_ctx.get_context(len(gens), flint.Ordering.lex, nametup=tuple(gens))
+            if isinstance(polys, dict):
+                res = ctx.from_dict({k: int(v) for k, v in polys.items()})
+            else:
+                res = flint.fmpz_mpoly_vec([ctx.from_dict({k: int(v) for k, v in p.items()}) for p in polys], ctx)
+
             self.poly_dict[k] = res
 
     @staticmethod
@@ -38,7 +37,7 @@ class PythonFlint(Library):
 
     @staticmethod
     def groebner(p):
-        return p.buchberger_naive()
+        return p.buchberger_naive().autoreduction()
 
 
 
