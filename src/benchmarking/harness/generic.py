@@ -1,86 +1,41 @@
-import cProfile
 import timeit
 import abc
-import tempfile
-import gc
-# import memray
 import logging
 import pickle
+import multiprocessing as mp
 import sys
-import multiprocessing
+import functools
 import queue
 
 
 logger = logging.getLogger(__name__)
 
 
-class Base:
+def _run(func, setup, repeats, q):
+    q.put(timeit.repeat(stmt=func, setup=setup, repeat=repeats, number=1))
+
+
+class Executor:
     def __init__(self, repeats: int = 3, gc: bool = False, timeout: int = 30):
         self.results = {}
         self.gc = gc
         self.timeout = timeout
         self.setup = "gc.enable()" if self.gc else "pass"
+        self.repeats = repeats
+        self.run = _run
 
-    def run(func=None, **_):
-        def foo(queue):
-            func()
-            queue.put(1)
-        return foo
-
-    def execute(self, name, func, **kwargs):
+    def execute(self, name, func):
+        q = mp.Queue()
         try:
-            q = multiprocessing.Queue()
-            p = multiprocessing.Process(target=self.run(func, **kwargs), args=(q,))
+            p = mp.Process(target=self.run, args=(func, self.setup, self.repeats, q))
             p.start()
-            self.results[name] = q.get(block=True, timeout=self.timeout)
+            self.results[name] = q.get(timeout=self.timeout)
         except queue.Empty:
-            self.results[name] = "timeout"
+            self.results[name] = [float("inf")]
             logger.error(f"timed out on {name} after {self.timeout}s")
+        finally:
             p.terminate()
-            p.join()
-        finally:
             q.close()
-
-
-class Benchmark(Base):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def run(self, func, *, repeats: int):
-        def foo(queue):
-            queue.put(timeit.repeat(stmt=func, setup=self.setup, repeat=repeats, number=1))
-        return foo
-
-
-class CPUProfile(Base):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def run(self, func=None, **_):
-        def foo(queue):
-            sys.activate_stack_trampoline("perf")
-            queue.put(timeit.repeat(stmt=func, setup=self.setup, repeat=1, number=1))
-            sys.deactivate_stack_trampoline()
-        return foo
-
-
-class MemoryProfile(Base):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def execute(self, name, func, **_):
-        f = tempfile.NamedTemporaryFile(suffix=".memray", delete=False)
-        try:
-            if not self.gc:
-                gc.disable()
-
-            with memray.Tracker(destination=memray.FileDestination(f.name, overwrite=True)):
-                func()
-        finally:
-            if not self.gc:
-                gc.enable()
-
-        self.results[name] = f.name
 
 
 class Library(abc.ABC):
@@ -88,7 +43,7 @@ class Library(abc.ABC):
         self.profiler = profiler
         self.poly_dict = {}
 
-    def run(self, run_list, repeats):
+    def run(self, run_list):
         self.results = {}
         for name, poly_keys in run_list.items():
             for poly_key in poly_keys:
@@ -96,10 +51,9 @@ class Library(abc.ABC):
                 logger.debug(f"running {type(self.profiler).__name__} on {name} with arguments {poly_key}")
 
                 func = getattr(self, name)
-                def foo(func=func, args=args):
-                    return func(*args)
+                foo = functools.partial(func, *args)
 
-                self.profiler.execute((name, poly_key), foo, repeats=repeats)
+                self.profiler.execute((name, poly_key), foo)
 
         self.results = self.profiler.results
 
@@ -109,6 +63,7 @@ class Library(abc.ABC):
 
     @classmethod
     def main(cls):
+        mp.set_start_method('fork')
         stdin = pickle.load(sys.stdin.buffer)
         print("Received:", {k: v if k != "polys" else "..." for k, v in stdin.items()}, file=sys.stderr)
 
@@ -118,16 +73,12 @@ class Library(abc.ABC):
         if stdin["log_file"] is not None:
             logging.basicConfig(filename=stdin["log_file"], encoding="utf-8", level=logging.DEBUG)
 
-        profiler = None
-        if stdin["type"] == "benchmark":
-            profiler = Benchmark(repeats, gc_enabled)
-        elif stdin["type"] == "cpu":
-            profiler = CPUProfile(repeats, gc_enabled)
-        elif stdin["type"] == "mem":
-            profiler = MemoryProfile(repeats, gc_enabled)
+        if stdin["type"] != "benchmark":
+            repeats = 1
+
+        profiler = Executor(repeats, gc_enabled)
 
         d = cls(profiler)
         d.parse_polys(stdin["polys"])
-        d.run(stdin["run_list"], repeats)
+        d.run(stdin["run_list"])
         pickle.dump(d.results, sys.stdout.buffer)
-

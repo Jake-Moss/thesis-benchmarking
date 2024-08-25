@@ -10,7 +10,7 @@
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
 
-      cflags = [ "-mtune=native" "-march=native" "-fno-omit-frame-pointer" "-mno-omit-leaf-frame-pointer" ];
+      cflags = [ "-g" "-mtune=native" "-march=native" "-fno-omit-frame-pointer" "-mno-omit-leaf-frame-pointer" ];
       opts = {
         enableOptimizations = true;
         enableLTO = true;
@@ -19,41 +19,29 @@
 
       py312 = (pkgs.python312.overrideAttrs (oldAttrs: rec {
         CFLAGS = oldAttrs.CFLAGS or [] ++ cflags;
-      })).override (opts // {
-        packageOverrides = python-final: python-prev: {
-          sympy = python-prev.sympy.overridePythonAttrs (oldAttrs: rec {
-            version = "1.13.2";
-            src = python-final.fetchPypi {
-              pname = "sympy";
-              inherit version;
-              sha256 = "401449d84d07be9d0c7a46a64bd54fe097667d5e7181bfe67ec777be9e01cb13";
-            };
-          });
-        };
-      });
+        dontStrip = true;
+      })).override opts;
 
       py313 = (pkgs.python313.overrideAttrs (oldAttrs: rec {
         CFLAGS = oldAttrs.CFLAGS or [] ++ cflags;
+        dontStrip = true;
       })).override opts;
 
-      # py313_JIT = (pkgs.python313.overrideAttrs (oldAttrs: rec {
-      #   CFLAGS = oldAttrs.CFLAGS or [] ++ cflags;
-      #   configureFlags = oldAttrs.configureFlags or [] ++ [ "--enable-experimental-jit" ];
-      #   buildInputs = oldAttrs.buildInputs or [] ++ [ pkgs.llvm_18 ];
-      #   nativeBuildInputs = oldAttrs.nativeBuildInputs or [] ++ [ pkgs.clang_18 ]; # [ pkgs.breakpointHook ];
-      # })).override opts;
+      py313_JIT = (pkgs.python313.overrideAttrs (oldAttrs: rec {
+        CFLAGS = oldAttrs.CFLAGS or [] ++ cflags;
+        dontStrip = true;
+        configureFlags = oldAttrs.configureFlags or [] ++ [ "--enable-experimental-jit" ];
+        buildInputs = oldAttrs.buildInputs or [] ++ [ pkgs.llvm_18 ];
+        nativeBuildInputs = oldAttrs.nativeBuildInputs or [] ++ [ pkgs.clang_18 ];
+      })).override opts;
 
       flint = (pkgs.flint3.overrideAttrs (oldAttrs: rec {
         CFLAGS = oldAttrs.CFLAGS or [] ++ cflags;
+        dontStrip = true;
         configureFlags = oldAttrs.configureFlags or [] ++ [ "--enable-avx2" ];
       }));
     in
       {
-        # packages.${system} = {
-        #   # inherit py312 py313 py313_JIT;
-        #   inherit py312 py313;
-        # };
-
         devShells.${system}.default = pkgs.mkShell {
           packages = [
             (py312.withPackages (python-pkgs: [
@@ -81,7 +69,12 @@
             pkgs.pkg-config
             pkgs.ninja
 
-            pkgs.linuxKernel.packages.linux_6_10.perf
+            pkgs.samply
+            pkgs.libz
+            pkgs.lz4
+            pkgs.libunwind
+            pkgs.nixseparatedebuginfod
+            pkgs.elfutils
           ];
 
           inputsFrom = [ flint ];
@@ -96,6 +89,10 @@
             . init-venvs.sh
             export SYMPY_GROUND_TYPES=python
           '';
+
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc pkgs.libz ];
+          NIX_DEBUG_INFO_DIRS = "${py312.debug}/lib/debug:${py313.debug}/lib/debug";
+
         };
       };
 }

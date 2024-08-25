@@ -4,19 +4,19 @@ import matplotlib.pyplot as plt
 import pstats
 
 # def main():
-with open("/tmp/output.pickle", "rb") as f:
+with open("results.pickle", "rb") as f:
     results = pickle.load(f)
 
 with open("polynomial_db/polys.pickle", "rb") as f:
     polys = pickle.load(f)
 
 
-# flattened_data = [(*k, v) for k, values in polys["normal"].items() for v in values]
-# poly_df = pd.DataFrame(flattened_data, columns=["generators", "sparsity", "exp_range", "coeff_range", "poly"])
-# poly_df["exp_range"] = poly_df["exp_range"].apply(lambda x: (x.start, x.stop, x.step)).astype("category")
-# poly_df["coeff_range"] = poly_df["coeff_range"].apply(lambda x: (x.start, x.stop, x.step)).astype("category")
-# poly_df["len"] = poly_df["poly"].apply(len)
-# poly_df = poly_df.set_index(["generators", "sparsity", "exp_range", "coeff_range"])
+flattened_data = [(*k, v) for k, values in polys.items() for v in values]
+poly_df = pd.DataFrame(flattened_data, columns=["generators", "sparsity", "exp_range", "coeff_range", "poly"])
+poly_df["exp_range"] = poly_df["exp_range"].apply(lambda x: (x.start, x.stop, x.step)).astype("category")
+poly_df["coeff_range"] = poly_df["coeff_range"].apply(lambda x: (x.start, x.stop, x.step)).astype("category")
+poly_df["len"] = poly_df["poly"].apply(len)
+poly_df = poly_df.set_index(["generators", "sparsity", "exp_range", "coeff_range"])
 
 
 flattened_data = []
@@ -32,7 +32,7 @@ for lang, runners in results.items():
                         runner["venv"],
                         profiler,
                         func,
-                        poly_key
+                        poly_key,
                         # (
                         #     *poly_key[:2],
                         #     (poly_key[2].start, poly_key[2].stop, poly_key[2].step),

@@ -3,6 +3,8 @@ import logging
 import pathlib
 import pickle
 import pandas as pd
+import time
+from datetime import datetime
 import sys
 sys.path.insert(0, str((pathlib.Path() / "src").absolute()))
 
@@ -40,9 +42,9 @@ def main():
 
     parser.add_argument(
         "output",
-        default=pathlib.Path() / "results.pickle",
+        default=pathlib.Path() / "results",
         type=pathlib.Path,
-        help="pickle file to output the results into",
+        help="output dir",
     )
 
     parser.add_argument(
@@ -95,6 +97,13 @@ def main():
         default=0,
     )
 
+    parser.add_argument(
+        "--cores",
+        dest="cores",
+        type=int,
+        default=4,
+    )
+
     args = parser.parse_args()
 
     if args.verbose == 1:
@@ -126,31 +135,59 @@ def main():
     with open(args.run_list, "rb") as f:
         run_list = pickle.load(f)
 
+    output = args.output / ("results_" + str(datetime.now().replace(microsecond=0)).replace(" ", "_"))
+    output.mkdir(parents=True)
+
     python_run_spec = PythonRunSpec(
         verbose=args.verbose,
         libs=python_libs,
         venvs=venvs,
         benchmark=args.benchmark,
-        repeats=1,
+        repeats=3,
         cpu=args.cpu,
         mem=args.mem,
         run_list=run_list,
         polys=polys,
         gc=[True],
-        flags=[],  # ["-X", "perf"],
+        flags=[],
+        output_dir=output,
     )
 
     external_run_spec = ExternalRunSpec(
-        verbose=args.verbose, libs=external_libs, benchmark=args.benchmark, repeats=3, run_list=run_list, polys={}
+        verbose=args.verbose, libs=external_libs, benchmark=args.benchmark, repeats=3, run_list=run_list, polys={}, output_dir=output
     )
 
     res = {}
-    python_run_spec.run()
+
+    todo = []
+    running = set()
+    completed = []
+    todo.extend(reversed(external_run_spec.runners))
+    todo.extend(reversed(python_run_spec.runners))
+
+    cores = min(args.cores, len(todo))
+    while todo or running:
+        if cores > 0 and todo:
+            cores = cores - 1
+            proc = todo.pop()
+            proc.start()
+            running.add(proc)
+            continue
+
+        for proc in running:
+            if proc.process.poll() is not None:
+                cores = cores + 1
+                proc.collect()
+                running.remove(proc)
+                completed.append(proc)
+                break
+        else:
+            time.sleep(1)
+
     res["python"] = [x.dump_dict() for x in python_run_spec.runners]
-    external_run_spec.run()
     res["external"] = [x.dump_dict() for x in python_run_spec.runners]
 
-    with open(args.output, "wb") as f:
+    with open(output / "results.pickle", "wb") as f:
         pickle.dump(res, f)
 
 
@@ -289,7 +326,7 @@ def gen_polys():
 
     else:
         if args.append:
-            with open(args.output, "rb") as f:
+            with open(args.output / "results.pickle", "rb") as f:
                 existing = pickle.load(f)
         else:
             existing = {}
@@ -305,7 +342,7 @@ def gen_polys():
 
         generator.generate()
 
-        with open(args.output, "wb") as f:
+        with open(args.output / "results.pickle", "wb") as f:
             pickle.dump((existing | generator.results), f)
 
 

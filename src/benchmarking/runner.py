@@ -17,10 +17,16 @@ _script_format = r"""\
 set -euo pipefail
 {venv}/bin/python {python_flags} {script}"""
 
-_perf_script_format = r"""\
+_samply_script_format = r"""\
 . {venv}/bin/activate {venv}/
 set -euo pipefail
-samply record --save-only -o {output} -- {venv}/bin/python {python_flags} {script}"""
+samply record --save-only --reuse-threads --profile-name {output} --rate 500 -o {output} -- {venv}/bin/python {python_flags} {script}"""
+
+_memray_script_format = r"""\
+. {venv}/bin/activate {venv}/
+set -euo pipefail
+{venv}/bin/python {python_flags} -m memray run --native --trace-python-allocators --aggregate --quiet --follow-fork --force -o {output} -- {script}
+"""
 
 _external_run_config_format = """\
 Running {lib}."""
@@ -58,22 +64,28 @@ Running with external libraries:
 
 class Runner(abc.ABC):
     subprocess_args = {
-        "capture_output": True,
+        "stdin": subprocess.PIPE,
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.PIPE,
     }
 
-    def __init__(self, library: str, flags: list[str], verbose):
+    def __init__(self, library: str, flags: list[str], verbose, output_dir):
         assert library in self.libraries
         self.library = library
         self.env = os.environ | self.libraries[library]["env"]
 
         if flags is None:
-            flags = tuple()
+            flags = []
 
         self.flags = flags
-        self.log_file = tempfile.NamedTemporaryFile(delete=False) if verbose else None
+        self.log_file = tempfile.NamedTemporaryFile(delete=False, dir=output_dir, prefix=(self.library + "-")) if verbose else None
 
     @abc.abstractmethod
-    def run():
+    def start():
+        pass
+
+    @abc.abstractmethod
+    def collect():
         pass
 
     def dump_dict(self):
@@ -99,22 +111,32 @@ class PythonRunner(Runner):
         type: str,
         gc: bool,
         repeats: int,
+        output_dir: pathlib.Path,
         flags: list[str] = None,
         verbose: bool = False,
     ):
-        super().__init__(library, flags, verbose)
+        super().__init__(library, flags, verbose, output_dir)
 
         self.venv = virtual_env
+
         if type == "cpu":
-            self.samply_file = tempfile.NamedTemporaryFile(delete=False) if verbose else None
-            self.script = _perf_script_format.format(
+            self.profile_file = output_dir / f"{self.library}_{virtual_env.stem}_samply_profile.json"
+            self.script = _samply_script_format.format(
+                venv=virtual_env,
+                python_flags=" ".join(self.flags + ["-X", "perf"]),
+                script=self.libraries[library]["file"],
+                output=self.profile_file,
+            )
+        elif type == "mem":
+            self.profile_file = output_dir / f"{self.library}_{virtual_env.stem}_memray_profile.bin"
+            self.script = _memray_script_format.format(
                 venv=virtual_env,
                 python_flags=" ".join(self.flags),
                 script=self.libraries[library]["file"],
-                output=self.samply_file.name,
+                output=self.profile_file,
             )
         else:
-            self.samply_file = None
+            self.profile_file = None
             self.script = _script_format.format(
                 venv=virtual_env, python_flags=" ".join(self.flags), script=self.libraries[library]["file"]
             )
@@ -128,7 +150,7 @@ class PythonRunner(Runner):
             "log_file": self.log_file.name if self.log_file is not None else None,
         }
 
-    def run(self):
+    def start(self):
         logger.info(
             self.run_config_format.format(
                 lib=self.library,
@@ -139,18 +161,32 @@ class PythonRunner(Runner):
             )
         )
 
-        self.process = subprocess.run(
+        self.process = subprocess.Popen(
             self.script,
             shell=True,
-            input=pickle.dumps(self.run_config),
             env=self.env,
             **self.subprocess_args,
         )
 
-        self.stdout = pickle.loads(self.process.stdout) if self.process.stdout else None
+        self.process.stdin.write(pickle.dumps(self.run_config))
+        self.process.stdin.flush()
+        self.process.stdin.close()
 
-        if self.samply_file is not None and self.stdout is not None:
-            self.stdout["samply_file"] = self.samply_file.name
+    def collect(self):
+        stdout = self.process.stdout.read()
+        self.stderr = self.process.stderr.read().decode("utf-8").strip()
+        try:
+            self.stdout = pickle.loads(stdout) if stdout else None
+        except pickle.UnpicklingError as e:
+            try:
+                e.add_note(f"Received stdout: '{stdout.decode('utf-8')}'")
+            except Exception:
+                pass
+            e.add_note(f"Received stderr: '{self.stderr}'")
+            raise e
+
+        if self.profile_file is not None and self.stdout is not None:
+            self.stdout["profile_file"] = self.profile_file.name
 
         logger.debug(
             self.report_format.format(
@@ -158,7 +194,7 @@ class PythonRunner(Runner):
                 run_config=self.run_config,
                 venv=self.venv,
                 stdout=self.stdout,
-                stderr=self.process.stderr.decode("utf-8").strip(),
+                stderr=self.stderr,
                 flags=self.flags,
             )
         )
@@ -186,6 +222,7 @@ class RunSpec:
     repeats: int
     run_list: list[str]
     polys: dict
+    output_dir: pathlib.Path
 
     def run(self):
         self.processes = [x.run() for x in self.runners]
@@ -232,6 +269,7 @@ class PythonRunSpec(RunSpec):
                 repeats=self.repeats,
                 verbose=self.verbose,
                 flags=self.flags,
+                output_dir=self.output_dir,
             )
             for lib, venv, gc, type in itertools.product(self.libs, self.venvs, self.gc, types)
         ]
