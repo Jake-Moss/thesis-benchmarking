@@ -86,19 +86,12 @@ polys_dict = {k: (gens_dict[k], polys_dict[k]) for k in polys_dict.keys()}
 
 run_list = {"groebner": [(x,) for x in polys_dict.keys()]}
 
+with open(pathlib.Path("polynomial_db") / "polys_df.pickle", "wb") as f:
+    pickle.dump(df, f)
+
 with open(pathlib.Path("polynomial_db") / "polys.pickle", "wb") as f:
     pickle.dump(polys_dict, f)
 
 with open(pathlib.Path("polynomial_db") / "run_list.pickle", "wb") as f:
     pickle.dump(run_list, f)
 
-with open(pathlib.Path("polynomial_db") / "polys.pickle", "rb") as f:
-    tmp = pickle.load(f)
-    # tmp = pd.DataFrame.from_dict(tmp)
-    # tmp.index.name = "name"
-
-
-# for row in df[df["total"] < pd.Timedelta(15, "s")].itertuples():
-#     groebner = sympy.groebner(row.system, row.generators)
-#     print(f"Constructed Gröbner basis for {row.Index}:")
-#     # print(groebner)

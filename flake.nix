@@ -51,6 +51,7 @@
               python-pkgs.pygobject3
               python-pkgs.pandas
               python-pkgs.sympy
+              python-pkgs.seaborn
             ]))
             pkgs.memray
 

@@ -5,6 +5,7 @@ import pickle
 import pandas as pd
 import time
 from datetime import datetime
+import subprocess
 import sys
 sys.path.insert(0, str((pathlib.Path() / "src").absolute()))
 
@@ -13,7 +14,7 @@ from benchmarking.runner import PythonRunSpec, ExternalRunSpec
 from benchmarking.gen_polys import PolynomialGenerator
 
 
-
+logger = logging.getLogger(__name__)
 default_venvs = [pathlib.Path().parent / ".venv-311", pathlib.Path().parent / ".venv-313"]
 
 
@@ -138,6 +139,10 @@ def main():
     output = args.output / ("results_" + str(datetime.now().replace(microsecond=0)).replace(" ", "_"))
     output.mkdir(parents=True)
 
+    run_list["groebner"] = run_list["groebner"][:5]
+
+    logger.info(f"Parsed run list: {run_list}")
+
     python_run_spec = PythonRunSpec(
         verbose=args.verbose,
         libs=python_libs,
@@ -148,7 +153,7 @@ def main():
         mem=args.mem,
         run_list=run_list,
         polys=polys,
-        gc=[True],
+        gc=[True, False],
         flags=[],
         output_dir=output,
     )
@@ -165,30 +170,43 @@ def main():
     todo.extend(reversed(external_run_spec.runners))
     todo.extend(reversed(python_run_spec.runners))
 
-    cores = min(args.cores, len(todo))
-    while todo or running:
-        if cores > 0 and todo:
-            cores = cores - 1
-            proc = todo.pop()
-            proc.start()
-            running.add(proc)
-            continue
+    try:
+        cores = min(args.cores, len(todo))
+        while todo or running:
+            if cores > 0 and todo:
+                cores = cores - 1
+                proc = todo.pop()
+                proc.start()
+                running.add(proc)
+                continue
 
+            for proc in running:
+                try:
+                    stdout, stderr = proc.process.communicate(input=None, timeout=0.5)
+                except subprocess.TimeoutExpired:
+                    continue
+                else:
+                    proc.stdout += stdout
+                    proc.stderr += stderr
+
+                if proc.process.poll() is not None:
+                    cores = cores + 1
+                    proc.collect()
+                    running.remove(proc)
+                    completed.append(proc)
+                    break
+    except KeyboardInterrupt as e:
         for proc in running:
-            if proc.process.poll() is not None:
-                cores = cores + 1
-                proc.collect()
-                running.remove(proc)
-                completed.append(proc)
-                break
-        else:
-            time.sleep(1)
+            proc.process.kill()
+        raise e
 
     res["python"] = [x.dump_dict() for x in python_run_spec.runners]
     res["external"] = [x.dump_dict() for x in python_run_spec.runners]
 
     with open(output / "results.pickle", "wb") as f:
         pickle.dump(res, f)
+
+    print("Wrote results to:", str(output))
 
 
 def parse_ranges(range_str):

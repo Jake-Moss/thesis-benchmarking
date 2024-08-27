@@ -22,12 +22,6 @@ _samply_script_format = r"""\
 set -euo pipefail
 samply record --save-only --reuse-threads --profile-name {output} --rate 500 -o {output} -- {venv}/bin/python {python_flags} {script}"""
 
-_memray_script_format = r"""\
-. {venv}/bin/activate {venv}/
-set -euo pipefail
-{venv}/bin/python {python_flags} -m memray run --native --trace-python-allocators --aggregate --quiet --follow-fork --force -o {output} -- {script}
-"""
-
 _external_run_config_format = """\
 Running {lib}."""
 
@@ -118,20 +112,13 @@ class PythonRunner(Runner):
         super().__init__(library, flags, verbose, output_dir)
 
         self.venv = virtual_env
+        self.type = type
 
-        if type == "cpu":
+        if self.type == "cpu":
             self.profile_file = output_dir / f"{self.library}_{virtual_env.stem}_samply_profile.json"
             self.script = _samply_script_format.format(
                 venv=virtual_env,
                 python_flags=" ".join(self.flags + ["-X", "perf"]),
-                script=self.libraries[library]["file"],
-                output=self.profile_file,
-            )
-        elif type == "mem":
-            self.profile_file = output_dir / f"{self.library}_{virtual_env.stem}_memray_profile.bin"
-            self.script = _memray_script_format.format(
-                venv=virtual_env,
-                python_flags=" ".join(self.flags),
                 script=self.libraries[library]["file"],
                 output=self.profile_file,
             )
@@ -142,7 +129,7 @@ class PythonRunner(Runner):
             )
 
         self.run_config = {
-            "type": type,
+            "type": self.type,
             "run_list": run_list,
             "polys": polys,
             "gc": gc,
@@ -154,7 +141,7 @@ class PythonRunner(Runner):
         logger.info(
             self.run_config_format.format(
                 lib=self.library,
-                run_config={k: v for k, v in self.run_config.items() if k != "polys"},
+                run_config={k: v for k, v in self.run_config.items() if k != "polys" and k != "run_list"},
                 venv=self.venv,
                 flags=self.flags,
                 env=self.libraries[self.library]["env"],
@@ -168,18 +155,18 @@ class PythonRunner(Runner):
             **self.subprocess_args,
         )
 
+        self.stdout = b""
+        self.stderr = b""
         self.process.stdin.write(pickle.dumps(self.run_config))
         self.process.stdin.flush()
-        self.process.stdin.close()
 
     def collect(self):
-        stdout = self.process.stdout.read()
-        self.stderr = self.process.stderr.read().decode("utf-8").strip()
+        self.stderr = self.stderr.decode("utf-8").strip()
         try:
-            self.stdout = pickle.loads(stdout) if stdout else None
+            self.stdout = pickle.loads(self.stdout) if self.stdout else None
         except pickle.UnpicklingError as e:
             try:
-                e.add_note(f"Received stdout: '{stdout.decode('utf-8')}'")
+                e.add_note(f"Received stdout: '{self.stdout.decode('utf-8')}'")
             except Exception:
                 pass
             e.add_note(f"Received stderr: '{self.stderr}'")
@@ -188,6 +175,7 @@ class PythonRunner(Runner):
         if self.profile_file is not None and self.stdout is not None:
             self.stdout["profile_file"] = self.profile_file.name
 
+        logger.info(f"{self.library} {self.type} process finished")
         logger.debug(
             self.report_format.format(
                 lib=self.library,
@@ -199,10 +187,9 @@ class PythonRunner(Runner):
             )
         )
 
-        return self.process
-
     def dump_dict(self):
         return super().dump_dict() | {
+            "type": self.type,
             "stdout": self.stdout,
             "venv": self.venv,
         }
