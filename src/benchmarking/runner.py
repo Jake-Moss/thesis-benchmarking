@@ -72,7 +72,9 @@ class Runner(abc.ABC):
             flags = []
 
         self.flags = flags
-        self.log_file = tempfile.NamedTemporaryFile(delete=False, dir=output_dir, prefix=(self.library + "-")) if verbose else None
+        self.log_file = (
+            tempfile.NamedTemporaryFile(delete=False, dir=output_dir, prefix=(self.library + "-")) if verbose else None
+        )
 
     @abc.abstractmethod
     def start():
@@ -240,9 +242,7 @@ class PythonRunSpec(RunSpec):
         )
 
         types = (
-            (["benchmark"] if self.benchmark else []) +
-            (["cpu"] if self.cpu else []) +
-            (["mem"] if self.mem else [])
+            (["benchmark"] if self.benchmark else []) + (["cpu"] if self.cpu else []) + (["mem"] if self.mem else [])
         )
 
         self.runners = [

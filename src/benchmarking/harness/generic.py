@@ -17,25 +17,28 @@ logger = logging.getLogger(__name__)
 def _run(func, setup, repeats, q):
     q.put(timeit.repeat(stmt=func, setup=setup, repeat=repeats, number=1))
 
+
 def _run_memray(func, setup, repeats, q, file):
     import memray
     import time
+
     dest = memray.FileDestination(file, overwrite=True)
     before = time.perf_counter_ns()
 
     with memray.Tracker(
-            destination=dest,
-            native_traces=True,
-            trace_python_allocators=True,
-            file_format=memray.FileFormat.ALL_ALLOCATIONS
+        destination=dest,
+        native_traces=True,
+        trace_python_allocators=True,
+        file_format=memray.FileFormat.ALL_ALLOCATIONS,
     ):
         func()
 
     after = time.perf_counter_ns()
     q.put((after - before) / 10e9)
 
+
 class Executor:
-    def __init__(self, repeats: int = 3, gc: bool = False, timeout: int = 1):
+    def __init__(self, repeats: int = 3, gc: bool = False, timeout: int = 30):
         self.results = {}
         self.gc = gc
         self.timeout = timeout
@@ -68,9 +71,10 @@ class MemrayExecutor(Executor):
         from memray import FileReader
         from memray.reporters.summary import SummaryReporter
         import os
+
         q = mp.Queue()
 
-        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as file:
+        with tempfile.NamedTemporaryFile(suffix=".bin") as file:
             try:
                 p = mp.Process(target=self.run, args=(func, self.setup, self.repeats, q, file.name))
                 p.start()
@@ -116,18 +120,21 @@ class MemrayExecutor(Executor):
                 percent_total = result.total_memory / reporter.current_memory_size * 100
                 percent_own = result.own_memory / reporter.current_memory_size * 100
 
-                res.append((
-                    location.function,
-                    location.file,
-                    result.total_memory,
-                    percent_total,
-                    result.own_memory,
-                    percent_own,
-                    result.n_allocations,
-                ))
+                res.append(
+                    (
+                        location.function,
+                        location.file,
+                        result.total_memory,
+                        percent_total,
+                        result.own_memory,
+                        percent_own,
+                        result.n_allocations,
+                    )
+                )
 
             self.results[name] = res
             logger.info("finished memray processing")
+
 
 class Library(abc.ABC):
     def __init__(self, profiler: dict):
@@ -154,7 +161,7 @@ class Library(abc.ABC):
 
     @classmethod
     def main(cls):
-        mp.set_start_method('fork')
+        mp.set_start_method("fork")
         stdin = pickle.load(sys.stdin.buffer)
         # print("Received:", {k: v if k != "polys" else "..." for k, v in stdin.items()}, file=sys.stderr)
 

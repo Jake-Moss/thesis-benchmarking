@@ -78,9 +78,7 @@ df = polys.join([descriptions, stats, timings], how="left").sort_values("total")
 # df = df[df["total"] < pd.Timedelta(10, "s")]
 
 gens_dict = df["generators"].apply(lambda gens: [str(x) for x in gens]).to_dict()
-polys_dict = df["system"].apply(
-    lambda system: [{k: str(v) for k, v in x.as_dict().items()} for x in system]
-).to_dict()
+polys_dict = df["system"].apply(lambda system: [{k: str(v) for k, v in x.as_dict().items()} for x in system]).to_dict()
 
 polys_dict = {k: (gens_dict[k], polys_dict[k]) for k in polys_dict.keys()}
 
@@ -94,4 +92,3 @@ with open(pathlib.Path("polynomial_db") / "polys.pickle", "wb") as f:
 
 with open(pathlib.Path("polynomial_db") / "run_list.pickle", "wb") as f:
     pickle.dump(run_list, f)
-

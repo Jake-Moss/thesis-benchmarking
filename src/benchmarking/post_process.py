@@ -1,10 +1,14 @@
 import pandas as pd
 import pickle
 import matplotlib.pyplot as plt
+from matplotlib import colormaps
 import seaborn as sns
+import math
 
+sns.set_theme("paper", font_scale=1)
+cmap = colormaps["gist_grey"]
 
-with open("/tmp/results_2024-08-27_20:35:43/results.pickle", "rb") as f:
+with open("results/results_2024-08-28_17:37:52/results.pickle", "rb") as f:
     results = pickle.load(f)
 
 with open("polynomial_db/polys_df.pickle", "rb") as f:
@@ -30,47 +34,81 @@ tmp["timings"] = bench_df["stdout"].apply(dict.values).explode()
 tmp["timings"] = tmp["timings"].apply(min)
 tmp = tmp.drop(columns=["stdout", "flags"])
 bench_df = tmp.reset_index(drop=True)
+# bench_df = bench_df[bench_df["timings"] != float("inf")]
 del tmp
 
+
+mem_df = mem_df.dropna().copy()
 mem_df["function"] = mem_df["stdout"].apply(dict.keys)
 tmp = mem_df.explode("function")
 tmp["usage"] = mem_df["stdout"].apply(dict.values).explode()
 tmp = tmp.drop(columns=["stdout", "flags"])
 mem_df = tmp.reset_index(drop=True)
+mem_df["max_allocations"] = mem_df["usage"].apply(lambda x: max(y[6] for y in x))
+mem_df["max_bytes"] = mem_df["usage"].apply(lambda x: max(y[2] for y in x))
+mem_df = mem_df.drop(columns="usage")
 del tmp
 
-mem_df["usage"] = mem_df["usage"].apply(lambda x: pd.DataFrame(x, columns=["function", "file", "total", "% total", "own", "% own", "allocations"]))
-mem_df["allocations"] = mem_df["usage"].apply(lambda x: x["allocations"].max())
+# mem_df["usage"] = mem_df["usage"].apply(lambda x: pd.DataFrame(x, columns=["function", "file", "total", "% total", "own", "% own", "allocations"]))
+# mem_df["allocations"] = mem_df["usage"].apply(lambda x: x["allocations"].max())
 
 
-
-
-groebner = bench_df.copy().iloc[bench_df["function"].apply(lambda x: x[0]).index]
+groebner = bench_df.copy().loc[bench_df["function"].apply(lambda x: x[0]).index]
 groebner["system"] = groebner["function"].apply(lambda x: x[1][0]).astype("category")
 groebner = groebner.drop(columns=["function"])
 groebner = groebner.set_index(["system", "library", "gc", "venv"]).sort_index()
-order = groebner.merge(
-    polys.reset_index().reset_index()[["index", "name"]].rename(columns={"name": "system"}),
-    on="system",
-    how="left",
-    validate="many_to_one"
-).sort_values(by="index")["system"].unique()
+
+groebner["dnf"] = groebner["timings"] == float("inf")
+
+
+groebner_mem = mem_df.copy().loc[mem_df["function"].apply(lambda x: x[0]).index]
+groebner_mem["system"] = groebner_mem["function"].apply(lambda x: x[1][0]).astype("category")
+groebner_mem = groebner_mem.drop(columns=["function"])
+groebner_mem = groebner_mem.set_index(["system", "library", "gc", "venv"]).sort_index()
+
+
+gb = groebner.reset_index().groupby(["system", "gc", "venv"], observed=False)
+groebner_with_finished = gb.filter(lambda x: not x["dnf"].all())
+groebner_with_unfinished = gb.filter(lambda x: x["dnf"].any() and not x["dnf"].all())
+groebner_unfinished_libraries = groebner_with_unfinished[groebner_with_unfinished["dnf"]].set_index(
+    ["system", "gc", "venv"]
+)["library"]
+groebner = groebner_with_finished.drop(columns=["dnf"]).set_index(["system", "library", "gc", "venv"]).sort_index()
+
+
+groebner_mem_with_finished = groebner_with_finished.merge(
+    groebner_mem, left_on=["system", "library", "gc", "venv"], right_index=True, how="left"
+).drop(columns="timings")
+
+order = (
+    groebner.merge(
+        polys.reset_index().reset_index()[["index", "name"]].rename(columns={"name": "system"}),
+        on="system",
+        how="left",
+        validate="many_to_one",
+    )
+    .sort_values(by="index")["system"]
+    .unique()
+)
 
 
 res = []
 gb = groebner.reset_index().groupby(by=["system", "gc", "venv"], observed=False)
-for (k, df), m in zip(gb, gb.min(numeric_only=True)["timings"].values):
+for (k, df), m in zip(gb, gb.max(numeric_only=True).dropna()["timings"].values):
     df["timings"] /= m
     res.append(df)
 
 groebner_normalised = pd.concat(res).set_index(["system", "library", "gc", "venv"]).sort_index()
 del res
 
+max_finite = groebner_with_finished["timings"][groebner_with_finished["timings"] != float("inf")].max()
+max_finite_normalised = groebner_normalised["timings"][groebner_normalised["timings"] != float("inf")].max()
+# groebner_normalised["timings"] = groebner_normalised["timings"].apply(lambda x: 2 * max_finite_normalised if x == float("inf") else x )
+
 sns_kwargs = {
     "x": "system",
     "y": "timings",
     "hue": "library",
-    "palette": "flare",
     "order": order,
 }
 
@@ -78,15 +116,17 @@ g = sns.FacetGrid(
     groebner_normalised.reset_index(),
     col="gc",
     row="venv",
-    aspect=4/3,
+    aspect=4 / 3,
 )
 g.map_dataframe(sns.barplot, **sns_kwargs)
 g.add_legend()
 g.figure.suptitle("Time (s) to construct reduced Gröbner basis")
-g.set_ylabels("Factors of fastest solve")
+g.set_ylabels("Factors of fastest")
 g.set_xlabels("Polynomial system")
 g.set_titles(row_template="{row_name}")
 g.tight_layout()
+g.tick_params(axis="x", labelrotation=70)
+g.set(ylim=(0, max_finite_normalised * 1.1))
 plt.show()
 
 gc_diff = (groebner.loc[:, :, True, :] - groebner.loc[:, :, False, :]) / groebner.loc[:, :, False, :]
@@ -101,10 +141,11 @@ gc_facet.set_ylabels("Relative time")
 gc_facet.set_xlabels("Polynomial system")
 gc_facet.set_titles(row_template="{row_name}")
 gc_facet.tight_layout()
+gc_facet.tick_params(axis="x", labelrotation=70)
 plt.show()
 
 
-version_diff = (groebner.loc[:, :, :, "3.13.0rc1"] - groebner.loc[:, :, :, "3.12.4"]) / groebner.loc[:, :, :, "3.13.0rc1"]
+version_diff = (groebner.loc[:, :, :, "3.13.0rc1"] - groebner.loc[:, :, :, "3.12.4"]) / groebner.loc[:, :, :, "3.12.4"]
 version_facet = sns.FacetGrid(
     version_diff.reset_index(),
     col="gc",
@@ -116,45 +157,83 @@ version_facet.set_ylabels("Relative time")
 version_facet.set_xlabels("Polynomial system")
 version_facet.set_titles(row_template="{row_name}")
 version_facet.tight_layout()
+version_facet.tick_params(axis="x", labelrotation=70)
 plt.show()
 
-groebner_mean = groebner_normalised.groupby(by=["library"]).mean(numeric_only=True)
-g = sns.barplot(
-    groebner_mean.reset_index(),
-    x="library",
-    y="timings",
-    hue="library",
-    palette="flare",
-    legend=True
-)
+groebner_mean = groebner_normalised.groupby(by=["library"], observed=False).mean(numeric_only=True)
+g = sns.barplot(groebner_mean.reset_index(), x="library", y="timings", hue="library", palette="flare", legend=True)
 g.figure.suptitle("Mean relative runtime to construct reduced Gröbner basis")
 g.set_ylabel("Mean relative runtime")
 g.set_xlabel("Polynomial system")
+g.tick_params(axis="x", labelrotation=70)
 plt.tight_layout()
 plt.show()
 
 
-
-
-
-
-groebner_mem = mem_df.copy().iloc[mem_df["function"].apply(lambda x: x[0]).index]
-groebner_mem["system"] = groebner_mem["function"].apply(lambda x: x[1][0]).astype("category")
-groebner_mem = groebner_mem.drop(columns=["function", "usage"])
-groebner_mem = groebner_mem.groupby(by=["library", "system"]).mean(numeric_only=True)
-
-
-g = sns.barplot(
-    groebner_mem.reset_index(),
-    x="system",
-    y="allocations",
-    hue="library",
-    palette="flare",
-    order=order,
-    legend=True
+pivot = groebner_normalised.reset_index().pivot(index=["library", "venv", "gc"], columns="system", values="timings")[
+    order
+]
+ax = sns.heatmap(
+    pivot,
+    annot=True,
+    fmt=".1f",
+    vmin=0,
+    vmax=(max_finite_normalised),
+    square=True,
+    xticklabels=True,
+    yticklabels=True,
+    cmap=cmap,
 )
-g.figure.suptitle("Number of Python and native allocations to construct reduced Gröbner basis")
-g.set_ylabel("Number of allocations")
-g.set_xlabel("Polynomial system")
+ax.set(xlabel="Polynomial System", ylabel="Factors of normalised time", title="Factors of normalised time")
 plt.tight_layout()
 plt.show()
+
+pivot = (
+    groebner_normalised.groupby(["system", "library"], observed=False)
+    .min(numeric_only=True)
+    .dropna()
+    .reset_index()
+    .pivot(index="library", columns="system", values="timings")[order]
+)
+ax = sns.heatmap(
+    pivot,
+    annot=True,
+    fmt=".1f",
+    vmin=0,
+    vmax=(max_finite_normalised),
+    square=True,
+    xticklabels=True,
+    yticklabels=True,
+    cmap=cmap,
+)
+ax.set(xlabel="Polynomial System", ylabel="Factors of normalised time", title="Minimum factors of normalised time")
+plt.tight_layout()
+plt.show()
+
+
+pivot = groebner_mem_with_finished.pivot(index=["library", "venv", "gc"], columns="system", values="max_bytes")[
+    order
+].map(math.log)
+ax = sns.heatmap(pivot, vmin=0, square=True, xticklabels=True, yticklabels=True, cmap=cmap)
+ax.set(xlabel="Polynomial System", ylabel="Library", title="log(Max total bytes allocated)")
+plt.tight_layout()
+plt.show()
+
+pivot = (
+    groebner_mem_with_finished.groupby(["system", "library"], observed=False)
+    .max(numeric_only=True)
+    .dropna()
+    .reset_index()
+    .pivot(index="library", columns="system", values="max_bytes")
+    .map(math.log)[order]
+)
+ax = sns.heatmap(pivot, vmin=0, square=True, xticklabels=True, yticklabels=True, cmap=cmap)
+ax.set(xlabel="Polynomial System", ylabel="Library", title="log(Max total bytes allocated)")
+plt.tight_layout()
+plt.show()
+
+
+# groebner_mem = mem_df.copy().iloc[mem_df["function"].apply(lambda x: x[0]).index]
+# groebner_mem["system"] = groebner_mem["function"].apply(lambda x: x[1][0]).astype("category")
+# groebner_mem = groebner_mem.drop(columns=["function", "usage"])
+# groebner_mem = groebner_mem.groupby(by=["library", "system"]).mean(numeric_only=True)

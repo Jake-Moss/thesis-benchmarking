@@ -44,9 +44,10 @@ class SymPy(Library):
     @staticmethod
     def groebner(system):
         p, gens = system
-        return sympy.groebner(p, *gens, method='f5b')
+        return sympy.groebner(p, *gens, method="f5b")
 
 
 if __name__ == "__main__":
     import sympy  # noqa: F401
+
     SymPy.main()

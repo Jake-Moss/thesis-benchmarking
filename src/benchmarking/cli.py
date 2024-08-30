@@ -7,6 +7,7 @@ import time
 from datetime import datetime
 import subprocess
 import sys
+
 sys.path.insert(0, str((pathlib.Path() / "src").absolute()))
 
 from benchmarking.harness import harnesses
@@ -94,7 +95,7 @@ def main():
         "-v",
         "--verbose",
         dest="verbose",
-        action='count',
+        action="count",
         default=0,
     )
 
@@ -139,7 +140,7 @@ def main():
     output = args.output / ("results_" + str(datetime.now().replace(microsecond=0)).replace(" ", "_"))
     output.mkdir(parents=True)
 
-    run_list["groebner"] = run_list["groebner"][:5]
+    # run_list["groebner"] = run_list["groebner"][:5]
 
     logger.info(f"Parsed run list: {run_list}")
 
@@ -159,7 +160,13 @@ def main():
     )
 
     external_run_spec = ExternalRunSpec(
-        verbose=args.verbose, libs=external_libs, benchmark=args.benchmark, repeats=3, run_list=run_list, polys={}, output_dir=output
+        verbose=args.verbose,
+        libs=external_libs,
+        benchmark=args.benchmark,
+        repeats=3,
+        run_list=run_list,
+        polys={},
+        output_dir=output,
     )
 
     res = {}
@@ -317,7 +324,7 @@ def gen_polys():
         "-v",
         "--verbose",
         dest="verbose",
-        action='count',
+        action="count",
         default=0,
     )
 

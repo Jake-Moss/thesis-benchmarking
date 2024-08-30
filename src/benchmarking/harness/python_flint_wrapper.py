@@ -40,7 +40,7 @@ class PythonFlint(Library):
         return p.buchberger_naive().autoreduction()
 
 
-
 if __name__ == "__main__":
     import flint  # noqa: F401
+
     PythonFlint.main()
