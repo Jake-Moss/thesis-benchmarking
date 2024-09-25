@@ -4,9 +4,79 @@ import matplotlib.pyplot as plt
 from matplotlib import colormaps
 import seaborn as sns
 import math
+import itertools
 
-sns.set_theme("paper", font_scale=1)
-cmap = colormaps["gist_grey"]
+sns.set_theme("notebook", font_scale=1, rc={'figure.figsize': (8, 6)})
+cmap = colormaps["binary"]
+
+
+with open("small_int_benchmark.txt") as f:
+    flint_timings = []
+    gmp_timings = []
+    flint_timings_vec = []
+    gmp_timings_vec = []
+
+    for (a, b, c, d) in itertools.batched((eval(x) for x in f.read().split("\n") if x), 4):
+        flint_timings.append(a)
+        gmp_timings.append(b)
+        flint_timings_vec.append(c)
+        gmp_timings_vec.append(d)
+
+    n = len(flint_timings)
+    flint_timings = [sum(x) / n for x in zip(*flint_timings)]
+    gmp_timings = [sum(x) / n for x in zip(*gmp_timings)]
+    flint_timings_vec = [sum(x) / n for x in zip(*flint_timings_vec)]
+    gmp_timings_vec = [sum(x) / n for x in zip(*gmp_timings_vec)]
+
+with open("small_int_benchmark_cython.txt") as f:
+    cython_timings = []
+    cython_timings_vec = []
+
+    for (a, b) in itertools.batched((eval(x) for x in f.read().split("\n") if x), 2):
+        cython_timings.append(a)
+        cython_timings_vec.append(b)
+
+    n = len(cython_timings)
+    cython_timings = [sum(x) / n for x in zip(*cython_timings)]
+    cython_timings_vec = [sum(x) / n for x in zip(*cython_timings_vec)]
+
+
+# Oscillations might be context switches on CPU
+f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+sns.lineplot(flint_timings, ax=ax2, label="FLINT")
+sns.lineplot(gmp_timings, ax=ax2, label="GMP")
+sns.lineplot(cython_timings, ax=ax2, label="Python")
+sns.lineplot(flint_timings_vec, ax=ax1, label="FLINT vector[1000]")
+sns.lineplot(gmp_timings_vec, ax=ax1, label="GMP vector[1000]")
+sns.lineplot(cython_timings_vec, ax=ax1, label="Python vector[1000]")
+ax1.set_yscale('log')
+ax2.set_yscale('log')
+f.supxlabel('Number of multiplications by 2')
+f.supylabel('Reference cycles')
+f.suptitle('Reference cycles to execute repeated multiplications by 2 (stalled and memory fenced)')
+plt.tight_layout()
+plt.savefig('images/small_int_benchmark.pdf', dpi=300, bbox_inches='tight')
+plt.show()
+
+n = 62 * 2
+f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+sns.lineplot(flint_timings[:n], ax=ax2, label="FLINT")
+sns.lineplot(gmp_timings[:n], ax=ax2, label="GMP")
+sns.lineplot(cython_timings[:n], ax=ax2, label="Python")
+sns.lineplot(flint_timings_vec[:n], ax=ax1, label="FLINT vector[1000]")
+sns.lineplot(gmp_timings_vec[:n], ax=ax1, label="GMP vector[1000]")
+sns.lineplot(cython_timings_vec[:n], ax=ax1, label="Python vector[1000]")
+ax1.set_yscale('log')
+ax2.set_yscale('log')
+f.supxlabel('Number of multiplications by 2')
+f.supylabel('Reference cycles')
+f.suptitle('Reference cycles to execute repeated multiplications by 2 (stalled and memory fenced)')
+plt.tight_layout()
+plt.savefig('images/small_int_benchmark_focused.pdf', dpi=300, bbox_inches='tight')
+plt.show()
+
+
+raise Exception()
 
 with open("results/results_2024-08-28_17:37:52/results.pickle", "rb") as f:
     results = pickle.load(f)
@@ -112,22 +182,30 @@ sns_kwargs = {
     "order": order,
 }
 
-g = sns.FacetGrid(
-    groebner_normalised.reset_index(),
-    col="gc",
-    row="venv",
-    aspect=4 / 3,
-)
-g.map_dataframe(sns.barplot, **sns_kwargs)
-g.add_legend()
+g = sns.barplot(groebner_with_finished.groupby(["system", "library"], observed=False).min(numeric_only=True).dropna().drop(columns="dnf").reset_index(), y="timings", legend=True)
 g.figure.suptitle("Time (s) to construct reduced Gröbner basis")
-g.set_ylabels("Factors of fastest")
-g.set_xlabels("Polynomial system")
-g.set_titles(row_template="{row_name}")
-g.tight_layout()
+g.set_ylabel("Factors of fastest")
+g.set_xlabel("Polynomial system")
 g.tick_params(axis="x", labelrotation=70)
-g.set(ylim=(0, max_finite_normalised * 1.1))
+plt.tight_layout()
 plt.show()
+
+# g = sns.FacetGrid(
+#     groebner_with_finished.reset_index(),
+#     col="gc",
+#     row="venv",
+#     aspect=4 / 3,
+# )
+# g.map_dataframe(sns.barplot, **sns_kwargs)
+# g.add_legend()
+# g.figure.suptitle("Time (s) to construct reduced Gröbner basis")
+# g.set_ylabels("Factors of fastest")
+# g.set_xlabels("Polynomial system")
+# g.set_titles(row_template="{row_name}")
+# g.tight_layout()
+# g.tick_params(axis="x", labelrotation=70)
+# # g.set(ylim=(0, max_finite_normalised * 1.1))
+# plt.show()
 
 gc_diff = (groebner.loc[:, :, True, :] - groebner.loc[:, :, False, :]) / groebner.loc[:, :, False, :]
 gc_facet = sns.FacetGrid(
@@ -188,7 +266,7 @@ ax.set(xlabel="Polynomial System", ylabel="Factors of normalised time", title="F
 plt.tight_layout()
 plt.show()
 
-pivot = (
+groebner_normalised_pivot = (
     groebner_normalised.groupby(["system", "library"], observed=False)
     .min(numeric_only=True)
     .dropna()
@@ -196,7 +274,7 @@ pivot = (
     .pivot(index="library", columns="system", values="timings")[order]
 )
 ax = sns.heatmap(
-    pivot,
+    groebner_normalised_pivot,
     annot=True,
     fmt=".1f",
     vmin=0,
