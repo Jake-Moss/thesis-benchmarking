@@ -21,7 +21,8 @@ void benchmark_single(void) {
   }
   fmpz_clear(x);
   fmpz_init_set_si(x, 1);
-  rdtsc_serial();
+  rdtsc_serial_start();
+  rdtsc_serial_end();
 
   // https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
   // The processor monotonically increments the time-stamp counter MSR every
@@ -33,11 +34,11 @@ void benchmark_single(void) {
   // Page 1763 Intel® 64 and IA-32 Architectures Software Developer’s Manual
   // Combined Volumes: 1, 2A, 2B, 2C, 2D, 3A, 3B, 3C, 3D, and 4
   for (int i = 0; i < ITERATIONS; i++) {
-    cycle_start = rdtsc_serial();
+    cycle_start = rdtsc_serial_start();
 
     fmpz_mul_si(x, x, FACTOR);
 
-    cycle_end = rdtsc_serial();
+    cycle_end = rdtsc_serial_end();
 
     res[i] = cycle_end - cycle_start;
   }
@@ -58,18 +59,20 @@ void benchmark_single(void) {
 
   for (int i = 0; i < 100; i++) {
     mpz_mul_si(y, y, FACTOR);
-    rdtsc_serial();
   }
   mpz_clear(y);
   mpz_init(y);
   mpz_set_si(y, 1);
 
+  rdtsc_serial_start();
+  rdtsc_serial_end();
+
   for (int i = 0; i < ITERATIONS; i++) {
-    cycle_start = rdtsc_serial();
+    cycle_start = rdtsc_serial_start();
 
     mpz_mul_si(y, y, FACTOR);
 
-    cycle_end = rdtsc_serial();
+    cycle_end = rdtsc_serial_end();
 
     res[i] = cycle_end - cycle_start;
   }
@@ -99,7 +102,8 @@ void benchmark_vec(void) {
   for (int i = 0; i < VEC_LENGTH; i++) {
     fmpz_mul_si(xs + i, xs + 1, 1);
   }
-  rdtsc_serial();
+  rdtsc_serial_start();
+  rdtsc_serial_end();
 
   // https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
   // The processor monotonically increments the time-stamp counter MSR every
@@ -111,13 +115,13 @@ void benchmark_vec(void) {
   // Page 1763 Intel® 64 and IA-32 Architectures Software Developer’s Manual
   // Combined Volumes: 1, 2A, 2B, 2C, 2D, 3A, 3B, 3C, 3D, and 4
   for (int k = 0; k < ITERATIONS; k++) {
-    cycle_start = rdtsc_serial();
+    cycle_start = rdtsc_serial_start();
 
     for (int i = 0; i < VEC_LENGTH; i++) {
       fmpz_mul_si(xs + i, xs + 1, FACTOR);
     }
 
-    cycle_end = rdtsc_serial();
+    cycle_end = rdtsc_serial_end();
 
     res[k] = cycle_end - cycle_start;
   }
@@ -143,16 +147,17 @@ void benchmark_vec(void) {
   for (int i = 0; i < VEC_LENGTH; i++) {
     mpz_mul_si(ys[i], ys[i], 1);
   }
-  rdtsc_serial();
+  rdtsc_serial_start();
+  rdtsc_serial_end();
 
   for (int i = 0; i < ITERATIONS; i++) {
-    cycle_start = rdtsc_serial();
+    cycle_start = rdtsc_serial_start();
 
     for (int i = 0; i < VEC_LENGTH; i++) {
         mpz_mul_si(ys[i], ys[i], FACTOR);
     }
 
-    cycle_end = rdtsc_serial();
+    cycle_end = rdtsc_serial_end();
 
     res[i] = cycle_end - cycle_start;
   }
@@ -172,8 +177,8 @@ void benchmark_vec(void) {
 
 int main(void) {
     for (int i = 0; i < TRIALS; i++) {
-      benchmark_single();
-      benchmark_vec();
+        benchmark_single();
+        benchmark_vec();
     }
   return 0;
 }
