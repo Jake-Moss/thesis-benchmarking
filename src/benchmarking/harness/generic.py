@@ -3,13 +3,10 @@ import abc
 import logging
 import pickle
 import multiprocessing as mp
-import sys
 import functools
 import queue
-import pathlib
 import tempfile
-import time
-
+import fileinput
 
 logger = logging.getLogger(__name__)
 
@@ -162,14 +159,26 @@ class Library(abc.ABC):
     @classmethod
     def main(cls):
         mp.set_start_method("fork")
-        stdin = pickle.load(sys.stdin.buffer)
-        # print("Received:", {k: v if k != "polys" else "..." for k, v in stdin.items()}, file=sys.stderr)
+        run_config_file, results_file = (line.rstrip("\n") for line in fileinput.input())
+
+        with open(run_config_file, "rb") as f:
+            stdin = pickle.load(f)
 
         repeats = stdin["repeats"]
         gc_enabled = stdin["gc"]
 
         if stdin["log_file"] is not None:
-            logging.basicConfig(filename=stdin["log_file"], encoding="utf-8", level=logging.DEBUG)
+            logging.basicConfig(
+                handlers=[
+                    logging.FileHandler(stdin["log_file"]),
+                    # logging.StreamHandler()
+                ],
+                encoding="utf-8",
+                level=logging.DEBUG
+            )
+
+        logging.info(f"Run config file: {run_config_file}")
+        logging.info(f"Results file: {results_file}")
 
         if stdin["type"] != "benchmark":
             repeats = 1
@@ -183,6 +192,7 @@ class Library(abc.ABC):
         d.parse_polys(stdin["polys"])
         logger.info(f"finished parsing, running {type(profiler).__name__}")
         d.run(stdin["run_list"])
-        logger.info("finished running, dumping results to stdout")
-        pickle.dump(d.results, sys.stdout.buffer)
+        logger.info(f"finished running, dumping results to {results_file}")
+        with open(results_file, "wb") as f:
+            pickle.dump(d.results, f)
         logger.info("dumped, exiting")

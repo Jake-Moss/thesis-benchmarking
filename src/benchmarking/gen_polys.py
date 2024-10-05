@@ -1,6 +1,7 @@
 import itertools
 import random
 import logging
+from collections import defaultdict
 
 
 logger = logging.getLogger(__name__)
@@ -67,4 +68,29 @@ class PolynomialGenerator:
 
                     if len(polys) != self.number:
                         logger.warn("generated less polynomials than requested")
-                    self.results[gens, sparsity, exp_range, coeff_range] = polys
+
+                    self.results[gens, sparsity, exp_range, coeff_range] \
+                        = (["x" + str(gen) for gen in range(gens)], polys)
+
+
+        groups = defaultdict(list)
+        for key in self.results.keys():
+            groups[key[0]].append(key)
+
+        singles = [(x,) for x in self.results.keys()]
+        combos = list(
+            itertools.chain.from_iterable(
+                itertools.combinations(v, r=2)
+                for v in groups.values()
+            )
+        )
+        self.run_list = {
+            "add": combos,
+            "sub": combos,
+            "mult": combos,
+            "divmod": combos,
+            "factor": singles,
+            "gcd": combos,
+            "lcm": combos,
+            "leading_term": singles,
+        }

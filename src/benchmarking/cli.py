@@ -140,16 +140,12 @@ def main():
     output = args.output / ("results_" + str(datetime.now().replace(microsecond=0)).replace(" ", "_"))
     output.mkdir(parents=True)
 
-    # run_list["groebner"] = run_list["groebner"][:5]
-
-    logger.info(f"Parsed run list: {run_list}")
-
     python_run_spec = PythonRunSpec(
         verbose=args.verbose,
         libs=python_libs,
         venvs=venvs,
         benchmark=args.benchmark,
-        repeats=3,
+        repeats=1,
         cpu=args.cpu,
         mem=args.mem,
         run_list=run_list,
@@ -188,20 +184,14 @@ def main():
                 continue
 
             for proc in running:
-                try:
-                    stdout, stderr = proc.process.communicate(input=None, timeout=0.5)
-                except subprocess.TimeoutExpired:
-                    continue
-                else:
-                    proc.stdout += stdout
-                    proc.stderr += stderr
-
+                time.sleep(0.5)
                 if proc.process.poll() is not None:
                     cores = cores + 1
                     proc.collect()
                     running.remove(proc)
                     completed.append(proc)
                     break
+
     except KeyboardInterrupt as e:
         for proc in running:
             proc.process.kill()
@@ -252,9 +242,9 @@ def gen_polys():
 
     parser.add_argument(
         "output",
-        default=pathlib.Path() / "output.pickle",
+        default=pathlib.Path(),
         type=pathlib.Path,
-        help="pickle file to output the polynomials into",
+        help="directory output the polynomials into",
     )
 
     parser.add_argument(
@@ -339,8 +329,10 @@ def gen_polys():
         with open(args.output, "rb") as f:
             existing = pickle.load(f)
 
-        flattened_data = [(*k, v) for k, values in existing.items() for v in values]
-        df = pd.DataFrame(flattened_data, columns=["generators", "sparsity", "exp_range", "coeff_range", "poly"])
+        # print(existing.keys())
+        # print(list(existing.values())[0])
+        flattened_data = [(*k, values[0], v) for k, values in existing.items() for v in values[1:]]
+        df = pd.DataFrame(flattened_data, columns=["generators", "sparsity", "exp_range", "coeff_range", "gens", "poly"])
         df["exp_range"] = df["exp_range"].apply(lambda x: (x.start, x.stop, x.step)).astype("category")
         df["coeff_range"] = df["coeff_range"].apply(lambda x: (x.start, x.stop, x.step)).astype("category")
         df["len"] = df["poly"].apply(len)
@@ -351,7 +343,7 @@ def gen_polys():
 
     else:
         if args.append:
-            with open(args.output / "results.pickle", "rb") as f:
+            with open(args.output / "polys.pickle", "rb") as f:
                 existing = pickle.load(f)
         else:
             existing = {}
@@ -367,8 +359,11 @@ def gen_polys():
 
         generator.generate()
 
-        with open(args.output / "results.pickle", "wb") as f:
+        with open(args.output / "polys.pickle", "wb") as f:
             pickle.dump((existing | generator.results), f)
+
+        with open(args.output / "run_list.pickle", "wb") as f:
+            pickle.dump(generator.run_list, f)
 
 
 def from_script():

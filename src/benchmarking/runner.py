@@ -27,8 +27,7 @@ Running {lib}."""
 
 _report_format = """\
 {lib} process finished:
-\tstdout (unpickled): {stdout!s}
-\tstderr: '{stderr}'"""
+\tresults (unpickled): '{results!s}'"""
 
 _python_run_config_format = (
     _external_run_config_format[:-1]
@@ -59,8 +58,7 @@ Running with external libraries:
 class Runner(abc.ABC):
     subprocess_args = {
         "stdin": subprocess.PIPE,
-        "stdout": subprocess.PIPE,
-        "stderr": subprocess.PIPE,
+        "text": True,
     }
 
     def __init__(self, library: str, flags: list[str], verbose, output_dir):
@@ -75,6 +73,9 @@ class Runner(abc.ABC):
         self.log_file = (
             tempfile.NamedTemporaryFile(delete=False, dir=output_dir, prefix=(self.library + "-")) if verbose else None
         )
+
+        self.run_config_file = tempfile.NamedTemporaryFile()
+        self.results_file = tempfile.NamedTemporaryFile()
 
     @abc.abstractmethod
     def start():
@@ -150,6 +151,9 @@ class PythonRunner(Runner):
             )
         )
 
+        with open(self.run_config_file.name, "wb") as f:
+            pickle.dump(self.run_config, f)
+
         self.process = subprocess.Popen(
             self.script,
             shell=True,
@@ -157,25 +161,17 @@ class PythonRunner(Runner):
             **self.subprocess_args,
         )
 
-        self.stdout = b""
-        self.stderr = b""
-        self.process.stdin.write(pickle.dumps(self.run_config))
-        self.process.stdin.flush()
+        try:
+            self.process.communicate(input="\n".join((self.run_config_file.name, self.results_file.name)), timeout=0.5)
+        except subprocess.TimeoutExpired:
+            pass
 
     def collect(self):
-        self.stderr = self.stderr.decode("utf-8").strip()
-        try:
-            self.stdout = pickle.loads(self.stdout) if self.stdout else None
-        except pickle.UnpicklingError as e:
-            try:
-                e.add_note(f"Received stdout: '{self.stdout.decode('utf-8')}'")
-            except Exception:
-                pass
-            e.add_note(f"Received stderr: '{self.stderr}'")
-            raise e
+        with open(self.results_file.name, "rb") as f:
+            self.results = pickle.load(f)
 
         if self.profile_file is not None and self.stdout is not None:
-            self.stdout["profile_file"] = self.profile_file.name
+            self.results["profile_file"] = self.profile_file.name
 
         logger.info(f"{self.library} {self.type} process finished")
         logger.debug(
@@ -183,16 +179,15 @@ class PythonRunner(Runner):
                 lib=self.library,
                 run_config=self.run_config,
                 venv=self.venv,
-                stdout=self.stdout,
-                stderr=self.stderr,
                 flags=self.flags,
+                results=self.results,
             )
         )
 
     def dump_dict(self):
         return super().dump_dict() | {
             "type": self.type,
-            "stdout": self.stdout,
+            "results": self.results,
             "venv": self.venv,
         }
 
@@ -273,6 +268,3 @@ class ExternalRunSpec(RunSpec):
             else "Running with no external libraries."
         )
         self.runners = []
-
-
-# def create_runners(python_libs, venvs, external_)
