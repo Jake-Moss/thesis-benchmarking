@@ -2,20 +2,22 @@ from benchmarking.harness.generic import Library
 
 
 ID = {
-    "python-flint": {"file": __file__, "env": {}},
+    "sagemath": {"file": __file__, "env": {}},
 }
 
 
-class PythonFlint(Library):
+class SageMath(Library):
     def parse_polys(self, polys_collection: dict):
-        self.poly_dict = {}
         for k, (gens, polys) in polys_collection.items():
-            ctx = flint.fmpz_mpoly_ctx.get(gens, flint.Ordering.lex)
-            if isinstance(polys, dict):
-                res = ctx.from_dict({k: int(v) for k, v in polys.items()})
-            else:
-                res = flint.fmpz_mpoly_vec([ctx.from_dict({k: int(v) for k, v in p.items()}) for p in polys], ctx)
+            R = PolynomialRing(ZZ, Integer(len(gens)), gens)
 
+            res = []
+            for poly in polys:
+                if isinstance(poly, dict):
+                    poly = R(poly)
+                else:
+                    poly = [R(p) for p in poly]
+                res.append(poly)
             self.poly_dict[k] = res
 
     @staticmethod
@@ -51,23 +53,23 @@ class PythonFlint(Library):
     @staticmethod
     def lcm(p1s, p2s):
         for p1, p2 in zip(p1s, p2s):
-            p1 * (p2 / (p1.gcd(p2)))
+            p1.lcm(p2)
 
     @staticmethod
     def leading_coefficient(p):
         for p1 in p:
-            p1.leading_coefficient()
+            p1.lc()
 
     @staticmethod
-    @staticmethod
     def groebner(p):
-        p.buchberger_naive().autoreduction()
+        I = ideal(p)
+        I.groebner_basis()
 
 
 if __name__ == "__main__":
     import multiprocessing as mp
-    import flint  # noqa: F401
+    from sage.all import PolynomialRing, ZZ, Integer, ideal
 
     mp.set_start_method("fork")
 
-    PythonFlint.main()
+    SageMath.main()

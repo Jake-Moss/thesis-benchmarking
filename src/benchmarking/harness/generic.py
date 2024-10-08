@@ -34,6 +34,10 @@ def _run_memray(func, setup, repeats, q, file):
     q.put((after - before) / 10e9)
 
 
+def _run_mathematica(func, setup, repeats):
+    return timeit.repeat(stmt=func, setup=setup, repeat=repeats, number=1)
+
+
 class Executor:
     def __init__(self, repeats: int = 3, gc: bool = False, timeout: int = 30):
         self.results = {}
@@ -49,6 +53,7 @@ class Executor:
             p = mp.Process(target=self.run, args=(func, self.setup, self.repeats, q))
             p.start()
             self.results[name] = q.get(timeout=self.timeout)
+            self.results[name] = self.run(func, self.setup, self.repeats, q)
         except queue.Empty:
             self.results[name] = [float("inf")]
             logger.error(f"timed out on {name} after {self.timeout}s")
@@ -133,6 +138,23 @@ class MemrayExecutor(Executor):
             logger.info("finished memray processing")
 
 
+class MathematicaExecutor(Executor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.run = _run_mathematica
+
+    def execute(self, name, func):
+        from sage.all import alarm
+        import cysignals
+        try:
+            alarm(self.timeout)
+            self.results[name] = self.run(func, self.setup, self.repeats)
+            logger.info("finished in time")
+        except (cysignals.signals.AlarmInterrupt, KeyboardInterrupt):
+            self.results[name] = [float("inf")]
+            logger.error(f"timed out on {name} after {self.timeout}s")
+
+
 class Library(abc.ABC):
     def __init__(self, profiler: dict):
         self.profiler = profiler
@@ -157,8 +179,7 @@ class Library(abc.ABC):
         pass
 
     @classmethod
-    def main(cls):
-        mp.set_start_method("fork")
+    def main(cls, Executor_cls=Executor):
         run_config_file, results_file = (line.rstrip("\n") for line in fileinput.input())
 
         with open(run_config_file, "rb") as f:
@@ -183,10 +204,12 @@ class Library(abc.ABC):
         if stdin["type"] != "benchmark":
             repeats = 1
 
+        timeout = stdin["timeout"]
+
         if stdin["type"] == "mem":
-            profiler = MemrayExecutor(repeats, gc_enabled)
+            profiler = MemrayExecutor(repeats, gc_enabled, timeout)
         else:
-            profiler = Executor(repeats, gc_enabled)
+            profiler = Executor_cls(repeats, gc_enabled, timeout)
 
         d = cls(profiler)
         d.parse_polys(stdin["polys"])

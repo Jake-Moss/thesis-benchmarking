@@ -2,6 +2,7 @@ import itertools
 import random
 import logging
 from collections import defaultdict
+import pandas as pd
 
 
 logger = logging.getLogger(__name__)
@@ -11,7 +12,7 @@ Generating {number} polynomials with:
 \tGenerators: {gens}
 \tCoefficients in: {coeff_range}
 \tExponents in: {exp_range}
-\tSparsity: {sparsity}% ({num_terms} terms)"""
+\tTerms: {num_terms}"""
 
 
 class PolynomialGenerator:
@@ -19,14 +20,14 @@ class PolynomialGenerator:
         self,
         *,
         generators: list[range],
-        sparsity: list[range],
+        terms: list[range],
         coefficients: list[range],
         exponents: list[range],
         number: int,
         seed: int,
     ):
         self.gens = generators
-        self.sparity = sparsity
+        self.terms = terms
         self.coefficients = coefficients
         self.exponents = exponents
         self.number = number
@@ -34,17 +35,18 @@ class PolynomialGenerator:
 
     def generate(self):
         self.results = {}
-        for gen_range, sparsity_range, coeff_range, exp_range in itertools.product(
-            self.gens, self.sparity, self.coefficients, self.exponents
+        self.singles = []
+        self.combos = []
+        for gen_range, num_terms_range, coeff_range, exp_range in itertools.product(
+                self.gens, self.terms, self.coefficients, self.exponents,
         ):
+            res = {}
             for gens in gen_range:
-                for sparsity in sparsity_range:
-                    num_terms = int(gens * len(exp_range) * (100 - sparsity) / 100.0)
+                for num_terms in num_terms_range:
                     logger.info(
                         poly_gen_format.format(
                             number=self.number,
                             gens=gens,
-                            sparsity=sparsity,
                             num_terms=num_terms,
                             coeff_range=coeff_range,
                             exp_range=exp_range,
@@ -62,35 +64,44 @@ class PolynomialGenerator:
                             poly[exp_vec] = coeff
 
                         if len(poly) != num_terms:
-                            logger.warn("polynomial generated with less terms than requested")
+                            logger.warning("polynomial generated with less terms than requested")
 
                         polys.append(poly)
 
-                    if len(polys) != self.number:
-                        logger.warn("generated less polynomials than requested")
-
-                    self.results[gens, sparsity, exp_range, coeff_range] \
+                    res[gens, num_terms, exp_range, coeff_range] \
                         = (["x" + str(gen) for gen in range(gens)], polys)
 
 
-        groups = defaultdict(list)
-        for key in self.results.keys():
-            groups[key[0]].append(key)
+            groups = defaultdict(list)
+            for key in res.keys():
+                groups[key[0]].append(key)
 
-        singles = [(x,) for x in self.results.keys()]
-        combos = list(
-            itertools.chain.from_iterable(
-                itertools.combinations(v, r=2)
-                for v in groups.values()
+            self.singles.extend((x,) for x in res.keys())
+            self.combos.extend(
+                itertools.chain.from_iterable(
+                    itertools.combinations_with_replacement(v, r=2)
+                    for v in groups.values()
+                )
             )
-        )
+
+            self.results.update(res)
+
         self.run_list = {
-            "add": combos,
-            "sub": combos,
-            "mult": combos,
-            "divmod": combos,
-            "factor": singles,
-            "gcd": combos,
-            "lcm": combos,
-            "leading_term": singles,
+            "add": self.combos,
+            "sub": self.combos,
+            "mult": self.combos,
+            "divmod": self.combos,
+            "factor": self.singles,
+            "gcd": self.combos,
+            # "lcm": self.combos,
+            "leading_coefficient": self.singles,
         }
+
+
+    @staticmethod
+    def parse_to_df(results):
+        flattened_data = [(*k, values[0], v) for k, values in results.items() for v in values[1:]]
+        df = pd.DataFrame(flattened_data, columns=["generators", "terms", "exp_range", "coeff_range", "gens", "poly"])
+        df["exp_range"] = df["exp_range"].apply(lambda x: (x.start, x.stop, x.step)).astype("category")
+        df["coeff_range"] = df["coeff_range"].apply(lambda x: (x.start, x.stop, x.step)).astype("category")
+        return df.explode("poly").reset_index(drop=True)

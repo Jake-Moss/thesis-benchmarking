@@ -50,6 +50,13 @@ def main():
     )
 
     parser.add_argument(
+        "--run_list_filter",
+        default=None,
+        nargs="*",
+        help="function name to polynomial key, unset for all",
+    )
+
+    parser.add_argument(
         "--benchmark",
         dest="benchmark",
         action="store_true",
@@ -85,10 +92,27 @@ def main():
     parser.add_argument(
         "--venvs",
         dest="venvs",
-        default=default_venvs,
+        default=[],
         type=pathlib.Path,
         help="virtual enviroments to use for Python libraries",
         nargs="*",
+    )
+
+    parser.add_argument(
+        "--gc",
+        dest="gc",
+        default=[True],
+        type=eval,
+        help="gc enabled or not or both",
+        nargs="+",
+    )
+
+    parser.add_argument(
+        "--repeats",
+        dest="repeats",
+        default=3,
+        type=int,
+        help="number of repeats for benchmarking",
     )
 
     parser.add_argument(
@@ -104,6 +128,13 @@ def main():
         dest="cores",
         type=int,
         default=4,
+    )
+
+    parser.add_argument(
+        "--timeout",
+        dest="timeout",
+        type=int,
+        default=30,
     )
 
     args = parser.parse_args()
@@ -122,6 +153,8 @@ def main():
         raise ValueError("cannot run a python-based benchmark without at least one venv")
     elif len(args.venvs) != 0 and len(python_libs) == 0:
         raise ValueError("venv provided but no python libraries specified")
+    elif len(args.gc) > 2:
+        raise ValueError("don't supply more than two gc options")
 
     venvs = []
     for venv in args.venvs:
@@ -137,7 +170,10 @@ def main():
     with open(args.run_list, "rb") as f:
         run_list = pickle.load(f)
 
-    output = args.output / ("results_" + str(datetime.now().replace(microsecond=0)).replace(" ", "_"))
+    if args.run_list_filter is not None:
+        run_list = {k: run_list[k] for k in args.run_list_filter}
+
+    output = args.output / ("results_" + str(datetime.now().replace(microsecond=0)).replace(" ", "_").replace(":", "-"))
     output.mkdir(parents=True)
 
     python_run_spec = PythonRunSpec(
@@ -145,14 +181,15 @@ def main():
         libs=python_libs,
         venvs=venvs,
         benchmark=args.benchmark,
-        repeats=1,
+        repeats=3,
         cpu=args.cpu,
         mem=args.mem,
         run_list=run_list,
         polys=polys,
-        gc=[True, False],
+        gc=args.gc,
         flags=[],
         output_dir=output,
+        timeout=args.timeout,
     )
 
     external_run_spec = ExternalRunSpec(
@@ -161,8 +198,9 @@ def main():
         benchmark=args.benchmark,
         repeats=3,
         run_list=run_list,
-        polys={},
+        polys=polys,
         output_dir=output,
+        timeout=args.timeout,
     )
 
     res = {}
@@ -173,6 +211,7 @@ def main():
     todo.extend(reversed(external_run_spec.runners))
     todo.extend(reversed(python_run_spec.runners))
 
+    something_broke = False
     try:
         cores = min(args.cores, len(todo))
         while todo or running:
@@ -187,7 +226,11 @@ def main():
                 time.sleep(0.5)
                 if proc.process.poll() is not None:
                     cores = cores + 1
-                    proc.collect()
+                    if proc.process.returncode == 0:
+                        proc.collect()
+                    else:
+                        something_broke = True
+                        logger.error(f"{proc.library} exited with code {proc.process.returncode}")
                     running.remove(proc)
                     completed.append(proc)
                     break
@@ -197,13 +240,16 @@ def main():
             proc.process.kill()
         raise e
 
-    res["python"] = [x.dump_dict() for x in python_run_spec.runners]
-    res["external"] = [x.dump_dict() for x in python_run_spec.runners]
+    if not something_broke:
+        res["python"] = [x.dump_dict() for x in python_run_spec.runners]
+        res["external"] = [x.dump_dict() for x in external_run_spec.runners]
 
-    with open(output / "results.pickle", "wb") as f:
-        pickle.dump(res, f)
+        with open(output / "results.pickle", "wb") as f:
+            pickle.dump(res, f)
 
-    print("Wrote results to:", str(output))
+        print("Wrote results to:", str(output))
+    else:
+        logger.error("Something broke! Didn't collect results!")
 
 
 def parse_ranges(range_str):
@@ -220,12 +266,12 @@ def parse_ranges(range_str):
             if ":" in part:
                 start, rest = part.split("-")
                 end, step = rest.split(":")
-                result.append(range(int(start), int(end), int(step)))
+                result.append(range(eval(start), eval(end), eval(step)))
             else:
                 start, end = part.split("-")
-                result.append(range(int(start), int(end)))
+                result.append(range(eval(start), eval(end)))
         else:
-            result.append(range(int(part), int(part) + 1))
+            result.append(range(eval(part), eval(part) + 1))
 
     return result
 
@@ -256,10 +302,10 @@ def gen_polys():
     )
 
     parser.add_argument(
-        "--sparsity",
-        dest="sparsity",
+        "--terms",
+        dest="terms",
         type=parse_ranges,
-        help="range of sparsities of the polynomial as an integer percentage (0 - 100) of all possible monomials",
+        help="range of terms of the polynomial",
         default=parse_ranges("50"),
     )
 
@@ -329,28 +375,22 @@ def gen_polys():
         with open(args.output, "rb") as f:
             existing = pickle.load(f)
 
-        # print(existing.keys())
-        # print(list(existing.values())[0])
-        flattened_data = [(*k, values[0], v) for k, values in existing.items() for v in values[1:]]
-        df = pd.DataFrame(flattened_data, columns=["generators", "sparsity", "exp_range", "coeff_range", "gens", "poly"])
-        df["exp_range"] = df["exp_range"].apply(lambda x: (x.start, x.stop, x.step)).astype("category")
-        df["coeff_range"] = df["coeff_range"].apply(lambda x: (x.start, x.stop, x.step)).astype("category")
-        df["len"] = df["poly"].apply(len)
+        df = PolynomialGenerator.parse_to_df(existing)
         print(df.to_string(max_rows=10, max_colwidth=20))
-        print()
-        print("Min len:", df["len"].min())
-        print("Max len:", df["len"].max())
 
     else:
         if args.append:
             with open(args.output / "polys.pickle", "rb") as f:
-                existing = pickle.load(f)
+                existing_polys = pickle.load(f)
+            with open(args.output / "run_list.pickle", "rb") as f:
+                existing_run_list = pickle.load(f)
         else:
-            existing = {}
+            existing_polys = {}
+            existing_run_list = {}
 
         generator = PolynomialGenerator(
             generators=args.gens,
-            sparsity=args.sparsity,
+            terms=args.terms,
             coefficients=args.coefficients,
             exponents=args.exponents,
             number=args.number,
@@ -359,11 +399,20 @@ def gen_polys():
 
         generator.generate()
 
+        merged = {
+            k: existing_run_list.get(k, generator.run_list.get(k))
+            for k in existing_run_list.keys() ^ generator.run_list.keys()
+        }
+        merged.update({
+            k: existing_run_list[k] + generator.run_list[k]
+            for k in existing_run_list.keys() & generator.run_list.keys()
+        })
+
         with open(args.output / "polys.pickle", "wb") as f:
-            pickle.dump((existing | generator.results), f)
+            pickle.dump((existing_polys | generator.results), f)
 
         with open(args.output / "run_list.pickle", "wb") as f:
-            pickle.dump(generator.run_list, f)
+            pickle.dump(merged, f)
 
 
 def from_script():

@@ -4,76 +4,77 @@ import matplotlib.pyplot as plt
 from matplotlib import colormaps
 import seaborn as sns
 import math
-import itertools
+from src.benchmarking.gen_polys import PolynomialGenerator
+
 
 sns.set_theme("notebook", font_scale=1, rc={'figure.figsize': (8, 6)})
 cmap = colormaps["binary"]
 
 
-with open("small_int_benchmark.txt") as f:
-    flint_timings = []
-    gmp_timings = []
-    flint_timings_vec = []
-    gmp_timings_vec = []
+# with open("small_int_benchmark.txt") as f:
+#     flint_timings = []
+#     gmp_timings = []
+#     flint_timings_vec = []
+#     gmp_timings_vec = []
 
-    for (a, b, c, d) in itertools.batched((eval(x) for x in f.read().split("\n") if x), 4):
-        flint_timings.append(a)
-        gmp_timings.append(b)
-        flint_timings_vec.append(c)
-        gmp_timings_vec.append(d)
+#     for (a, b, c, d) in itertools.batched((eval(x) for x in f.read().split("\n") if x), 4):
+#         flint_timings.append(a)
+#         gmp_timings.append(b)
+#         flint_timings_vec.append(c)
+#         gmp_timings_vec.append(d)
 
-    n = len(flint_timings)
-    flint_timings = [sum(x) / n for x in zip(*flint_timings)]
-    gmp_timings = [sum(x) / n for x in zip(*gmp_timings)]
-    flint_timings_vec = [sum(x) / n for x in zip(*flint_timings_vec)]
-    gmp_timings_vec = [sum(x) / n for x in zip(*gmp_timings_vec)]
+#     n = len(flint_timings)
+#     flint_timings = [sum(x) / n for x in zip(*flint_timings)]
+#     gmp_timings = [sum(x) / n for x in zip(*gmp_timings)]
+#     flint_timings_vec = [sum(x) / n for x in zip(*flint_timings_vec)]
+#     gmp_timings_vec = [sum(x) / n for x in zip(*gmp_timings_vec)]
 
-with open("small_int_benchmark_cython.txt") as f:
-    cython_timings = []
-    cython_timings_vec = []
+# with open("small_int_benchmark_cython.txt") as f:
+#     cython_timings = []
+#     cython_timings_vec = []
 
-    for (a, b) in itertools.batched((eval(x) for x in f.read().split("\n") if x), 2):
-        cython_timings.append(a)
-        cython_timings_vec.append(b)
+#     for (a, b) in itertools.batched((eval(x) for x in f.read().split("\n") if x), 2):
+#         cython_timings.append(a)
+#         cython_timings_vec.append(b)
 
-    n = len(cython_timings)
-    cython_timings = [sum(x) / n for x in zip(*cython_timings)]
-    cython_timings_vec = [sum(x) / n for x in zip(*cython_timings_vec)]
+#     n = len(cython_timings)
+#     cython_timings = [sum(x) / n for x in zip(*cython_timings)]
+#     cython_timings_vec = [sum(x) / n for x in zip(*cython_timings_vec)]
 
-x = list(range(1, len(flint_timings) + 1))
-# Oscillations might be context switches on CPU
-f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
-sns.lineplot(x=x, y=flint_timings, ax=ax2, label="FLINT")
-sns.lineplot(x=x, y=gmp_timings, ax=ax2, label="GMP")
-sns.lineplot(x=x, y=cython_timings, ax=ax2, label="Python")
-sns.lineplot(x=x, y=flint_timings_vec, ax=ax1, label="FLINT vector[1000]")
-sns.lineplot(x=x, y=gmp_timings_vec, ax=ax1, label="GMP vector[1000]")
-sns.lineplot(x=x, y=cython_timings_vec, ax=ax1, label="Python vector[1000]")
-ax1.set_yscale('log')
-ax2.set_yscale('log')
-f.supxlabel('Number of multiplications by 2')
-f.supylabel('Reference cycles')
-f.suptitle('Reference cycles to execute repeated multiplications by 2 (stalled and memory fenced)')
-plt.tight_layout()
-plt.savefig('images/small_int_benchmark.pdf', dpi=300, bbox_inches='tight')
-plt.show()
+# x = list(range(1, len(flint_timings) + 1))
+# # Oscillations might be context switches on CPU
+# f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+# sns.lineplot(x=x, y=flint_timings, ax=ax2, label="FLINT")
+# sns.lineplot(x=x, y=gmp_timings, ax=ax2, label="GMP")
+# sns.lineplot(x=x, y=cython_timings, ax=ax2, label="Python")
+# sns.lineplot(x=x, y=flint_timings_vec, ax=ax1, label="FLINT vector[1000]")
+# sns.lineplot(x=x, y=gmp_timings_vec, ax=ax1, label="GMP vector[1000]")
+# sns.lineplot(x=x, y=cython_timings_vec, ax=ax1, label="Python vector[1000]")
+# ax1.set_yscale('log')
+# ax2.set_yscale('log')
+# f.supxlabel('Number of multiplications by 2')
+# f.supylabel('Reference cycles')
+# f.suptitle('Reference cycles to execute repeated multiplications by 2 (stalled and memory fenced)')
+# plt.tight_layout()
+# plt.savefig('images/small_int_benchmark.pdf', dpi=300, bbox_inches='tight')
+# plt.show()
 
-n = 62 * 2
-f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
-sns.lineplot(x=x[:n], y=flint_timings[:n], ax=ax2, label="FLINT")
-sns.lineplot(x=x[:n], y=gmp_timings[:n], ax=ax2, label="GMP")
-sns.lineplot(x=x[:n], y=cython_timings[:n], ax=ax2, label="Python")
-sns.lineplot(x=x[:n], y=flint_timings_vec[:n], ax=ax1, label="FLINT vector[1000]")
-sns.lineplot(x=x[:n], y=gmp_timings_vec[:n], ax=ax1, label="GMP vector[1000]")
-sns.lineplot(x=x[:n], y=cython_timings_vec[:n], ax=ax1, label="Python vector[1000]")
-ax1.set_yscale('log')
-ax2.set_yscale('log')
-f.supxlabel('Number of multiplications by 2')
-f.supylabel('Reference cycles')
-f.suptitle('Reference cycles to execute repeated multiplications by 2 (stalled and memory fenced)')
-plt.tight_layout()
-plt.savefig('images/small_int_benchmark_focused.pdf', dpi=300, bbox_inches='tight')
-plt.show()
+# n = 62 * 2
+# f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+# sns.lineplot(x=x[:n], y=flint_timings[:n], ax=ax2, label="FLINT")
+# sns.lineplot(x=x[:n], y=gmp_timings[:n], ax=ax2, label="GMP")
+# sns.lineplot(x=x[:n], y=cython_timings[:n], ax=ax2, label="Python")
+# sns.lineplot(x=x[:n], y=flint_timings_vec[:n], ax=ax1, label="FLINT vector[1000]")
+# sns.lineplot(x=x[:n], y=gmp_timings_vec[:n], ax=ax1, label="GMP vector[1000]")
+# sns.lineplot(x=x[:n], y=cython_timings_vec[:n], ax=ax1, label="Python vector[1000]")
+# ax1.set_yscale('log')
+# ax2.set_yscale('log')
+# f.supxlabel('Number of multiplications by 2')
+# f.supylabel('Reference cycles')
+# f.suptitle('Reference cycles to execute repeated multiplications by 2 (stalled and memory fenced)')
+# plt.tight_layout()
+# plt.savefig('images/small_int_benchmark_focused.pdf', dpi=300, bbox_inches='tight')
+# plt.show()
 
 
 # f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
@@ -97,65 +98,201 @@ plt.show()
 # plt.show()
 
 
-raise Exception()
+# raise Exception()
 
-with open("results/results_2024-08-28_17:37:52/results.pickle", "rb") as f:
-    results = pickle.load(f)
+def load_external_results(path):
+    with open(path, "rb") as f:
+        results = pickle.load(f)
+    polys.index = polys.index.astype("category")
+
+    res = pd.DataFrame(results["external"])
+    res = pd.concat([res[["results", "flags"]], res.drop(columns=["results", "flags"]).astype("category")], axis=1)
+    print(res.head())
+    gb = res.groupby(by="type", observed=False)
+
+    try:
+        bench_df = gb.get_group("benchmark")
+        bench_df = bench_df.drop(columns=["type"])
+
+        bench_df["function"] = bench_df["results"].apply(dict.keys)
+        tmp = bench_df.explode("function")
+        tmp["timings"] = bench_df["results"].apply(dict.values).explode()
+        tmp["timings"] = tmp["timings"].apply(min)
+        tmp = tmp.drop(columns=["results", "flags"])
+        tmp["args"] = tmp.function.apply(lambda x: x[1])
+        tmp["function"] = tmp.function.apply(lambda x: x[0])
+        bench_df = tmp.reset_index(drop=True)
+        # bench_df = bench_df[bench_df["timings"] != float("inf")]
+        del tmp
+    except KeyError:
+        bench_df = pd.DataFrame()
+
+    return bench_df
+
+def load_python_results(path):
+    with open(path, "rb") as f:
+        results = pickle.load(f)
+    polys.index = polys.index.astype("category")
+
+    res = pd.DataFrame(results["python"])
+    res["venv"] = res["venv"].apply(str)
+    res = pd.concat([res[["results", "flags"]], res.drop(columns=["results", "flags"]).astype("category")], axis=1)
+    res["venv"] = res["venv"].map({".venv-312": "3.12.4", ".venv-313": "3.13.0rc1"})
+    gb = res.groupby(by="type", observed=False)
+
+    try:
+        bench_df = gb.get_group("benchmark")
+        bench_df = bench_df.drop(columns=["type"])
+
+        bench_df["function"] = bench_df["results"].apply(dict.keys)
+        tmp = bench_df.explode("function")
+        tmp["timings"] = bench_df["results"].apply(dict.values).explode()
+        tmp["timings"] = tmp["timings"].apply(min)
+        tmp = tmp.drop(columns=["results", "flags"])
+        tmp["args"] = tmp.function.apply(lambda x: x[1])
+        tmp["function"] = tmp.function.apply(lambda x: x[0])
+        bench_df = tmp.reset_index(drop=True)
+        # bench_df = bench_df[bench_df["timings"] != float("inf")]
+        del tmp
+    except KeyError:
+        bench_df = pd.DataFrame()
+
+    try:
+        cpu_df = gb.get_group("cpu")
+        cpu_df = cpu_df.drop(columns=["type"])
+    except KeyError:
+        cpu_df = pd.DataFrame()
+
+    try:
+        mem_df = gb.get_group("mem")
+        mem_df = mem_df.drop(columns=["type"])
+
+        mem_df = mem_df.dropna().copy()
+        mem_df["function"] = mem_df["results"].apply(dict.keys)
+        tmp = mem_df.explode("function")
+        tmp["usage"] = mem_df["results"].apply(dict.values).explode()
+        tmp = tmp.drop(columns=["results", "flags"])
+        mem_df = tmp.reset_index(drop=True)
+        mem_df["max_allocations"] = mem_df["usage"].apply(lambda x: max(y[6] for y in x))
+        mem_df["max_bytes"] = mem_df["usage"].apply(lambda x: max(y[2] for y in x))
+        mem_df = mem_df.drop(columns="usage")
+        del tmp
+    except KeyError:
+        mem_df = pd.DataFrame()
+
+    return bench_df, cpu_df, mem_df
+
+
+
+# Fundementals
+
+
+
+# bench_df, cpu_df, mem_df = load_results("results/results_2024-10-08_01-29-50/results.pickle")
+
+# with open("./polys.pickle", "rb") as f:
+#     polys = PolynomialGenerator.parse_to_df(pickle.load(f))
+
+# coeff_map = dict((range(*k), v) for k, v in zip(polys["coeff_range"].unique().sort_values(), ["small coeff", "large coeff"]))
+# exp_map = dict((range(*k), v) for k, v in zip(polys["exp_range"].unique().sort_values(), ["small exp", "large exp"]))
+
+# bench_df["args"] = bench_df.args.apply(lambda args: tuple((x[0], x[1], exp_map[x[2]], coeff_map[x[3]]) for x in args))
+
+# gb = bench_df.groupby(by=["library", "function", "args"], observed=True)
+# bench_df = gb["timings"].min().reset_index()
+# gb = bench_df.groupby("function")
+
+# unary_functions = pd.concat([gb.get_group("factor"), gb.get_group("leading_coefficient")])
+# binary_functions = pd.concat([gb.get_group(func) for func in ["add", "sub", "mult", "divmod", "gcd"]])
+
+# unary_functions[["Generators", "Terms", "Exponent size", "Coefficient size"]] = unary_functions.args.apply(lambda x: x[0]).apply(pd.Series)
+# unary_functions = unary_functions.drop(columns="args")
+
+
+# sns_kwargs = {
+#     "x": "function",
+#     "y": "timings",
+#     "hue": "library",
+# }
+
+
+# for k, df in unary_functions.groupby(["Exponent size", "Coefficient size"]):
+#     pivot = df.pivot(index=["library", "Generators", "Terms"], columns="function", values="timings")
+#     # ax = sns.heatmap(
+#     #     pivot,
+#     #     annot=True,
+#     #     fmt=".1f",
+#     #     vmin=0,
+#     #     # vmax=(max_finite_normalised),
+#     #     square=True,
+#     #     xticklabels=True,
+#     #     yticklabels=True,
+#     #     cmap=cmap,
+#     # )
+#     # ax.set(xlabel="Polynomial System", ylabel="Factors of normalised time", title="Factors of normalised time")
+#     # plt.tight_layout()
+#     # plt.show()
+
+
+#     facet = sns.FacetGrid(
+#         pivot,
+#         col="function",
+#     )
+#     facet.map_dataframe(
+#         lambda *args, **kwargs: sns.heatmap(
+#             pivot,
+#             *args,
+#             annot=True,
+#             fmt=".1f",
+#             vmin=0,
+#             # vmax=(max_finite_normalised),
+#             square=True,
+#             xticklabels=True,
+#             yticklabels=True,
+#             cmap=cmap,
+#             **kwargs
+#         ),
+#         **sns_kwargs
+#     )
+#     facet.add_legend()
+#     facet.figure.suptitle("Time delta (s) from enabling garbage collection")
+#     facet.set_ylabels("Relative time")
+#     facet.set_xlabels("Polynomial system")
+#     facet.set_titles(row_template="{row_name}")
+#     facet.tight_layout()
+#     facet.tick_params(axis="x", labelrotation=70)
+#     plt.show()
+#     break
+
+
+
+# raise Exception()
+
+### Groebner stuff
+
 
 with open("polynomial_db/polys_df.pickle", "rb") as f:
     polys = pickle.load(f)
 
-polys.index = polys.index.astype("category")
-
-res = pd.DataFrame(results["python"])
-res["venv"] = res["venv"].apply(str)
-res = pd.concat([res[["stdout", "flags"]], res.drop(columns=["stdout", "flags"]).astype("category")], axis=1)
-res["venv"] = res["venv"].map({".venv-312": "3.12.4", ".venv-313": "3.13.0rc1"})
-gb = res.groupby(by="type", observed=False)
-
-
-(_, bench_df), (_, cpu_df), (_, mem_df) = list(gb)
-bench_df = bench_df.drop(columns=["type"])
-cpu_df = cpu_df.drop(columns=["type"])
-mem_df = mem_df.drop(columns=["type"])
-
-bench_df["function"] = bench_df["stdout"].apply(dict.keys)
-tmp = bench_df.explode("function")
-tmp["timings"] = bench_df["stdout"].apply(dict.values).explode()
-tmp["timings"] = tmp["timings"].apply(min)
-tmp = tmp.drop(columns=["stdout", "flags"])
-bench_df = tmp.reset_index(drop=True)
-# bench_df = bench_df[bench_df["timings"] != float("inf")]
-del tmp
-
-
-mem_df = mem_df.dropna().copy()
-mem_df["function"] = mem_df["stdout"].apply(dict.keys)
-tmp = mem_df.explode("function")
-tmp["usage"] = mem_df["stdout"].apply(dict.values).explode()
-tmp = tmp.drop(columns=["stdout", "flags"])
-mem_df = tmp.reset_index(drop=True)
-mem_df["max_allocations"] = mem_df["usage"].apply(lambda x: max(y[6] for y in x))
-mem_df["max_bytes"] = mem_df["usage"].apply(lambda x: max(y[2] for y in x))
-mem_df = mem_df.drop(columns="usage")
-del tmp
-
 # mem_df["usage"] = mem_df["usage"].apply(lambda x: pd.DataFrame(x, columns=["function", "file", "total", "% total", "own", "% own", "allocations"]))
 # mem_df["allocations"] = mem_df["usage"].apply(lambda x: x["allocations"].max())
 
+bench_df, cpu_df, mem_df = load_python_results("results/results_2024-10-08_01-06-21/results.pickle")
 
-groebner = bench_df.copy().loc[bench_df["function"].apply(lambda x: x[0]).index]
-groebner["system"] = groebner["function"].apply(lambda x: x[1][0]).astype("category")
-groebner = groebner.drop(columns=["function"])
+external_res = load_external_results("results/results_2024-10-08_01-06-21/results.pickle")
+
+groebner = bench_df.copy()[bench_df["function"] == "groebner"].drop(columns="function")
+groebner["system"] = groebner["args"].apply(lambda x: x[0]).astype("category")
+groebner = groebner.drop(columns="args")
 groebner = groebner.set_index(["system", "library", "gc", "venv"]).sort_index()
 
 groebner["dnf"] = groebner["timings"] == float("inf")
 
 
-groebner_mem = mem_df.copy().loc[mem_df["function"].apply(lambda x: x[0]).index]
-groebner_mem["system"] = groebner_mem["function"].apply(lambda x: x[1][0]).astype("category")
-groebner_mem = groebner_mem.drop(columns=["function"])
-groebner_mem = groebner_mem.set_index(["system", "library", "gc", "venv"]).sort_index()
+# groebner_mem = mem_df.copy().loc[mem_df["function"].apply(lambda x: x[0]).index]
+# groebner_mem["system"] = groebner_mem["function"].apply(lambda x: x[1][0]).astype("category")
+# groebner_mem = groebner_mem.drop(columns=["function"])
+# groebner_mem = groebner_mem.set_index(["system", "library", "gc", "venv"]).sort_index()
 
 
 gb = groebner.reset_index().groupby(["system", "gc", "venv"], observed=False)
@@ -167,9 +304,9 @@ groebner_unfinished_libraries = groebner_with_unfinished[groebner_with_unfinishe
 groebner = groebner_with_finished.drop(columns=["dnf"]).set_index(["system", "library", "gc", "venv"]).sort_index()
 
 
-groebner_mem_with_finished = groebner_with_finished.merge(
-    groebner_mem, left_on=["system", "library", "gc", "venv"], right_index=True, how="left"
-).drop(columns="timings")
+# groebner_mem_with_finished = groebner_with_finished.merge(
+#     groebner_mem, left_on=["system", "library", "gc", "venv"], right_index=True, how="left"
+# ).drop(columns="timings")
 
 order = (
     groebner.merge(
@@ -203,13 +340,13 @@ sns_kwargs = {
     "order": order,
 }
 
-g = sns.barplot(groebner_with_finished.groupby(["system", "library"], observed=False).min(numeric_only=True).dropna().drop(columns="dnf").reset_index(), y="timings", legend=True)
-g.figure.suptitle("Time (s) to construct reduced Gröbner basis")
-g.set_ylabel("Factors of fastest")
-g.set_xlabel("Polynomial system")
-g.tick_params(axis="x", labelrotation=70)
-plt.tight_layout()
-plt.show()
+# g = sns.barplot(groebner_with_finished.groupby(["system", "library"], observed=False).min(numeric_only=True).dropna().drop(columns="dnf").reset_index(), y="timings", legend=True)
+# g.figure.suptitle("Time (s) to construct reduced Gröbner basis")
+# g.set_ylabel("Factors of fastest")
+# g.set_xlabel("Polynomial system")
+# g.tick_params(axis="x", labelrotation=70)
+# plt.tight_layout()
+# plt.show()
 
 # g = sns.FacetGrid(
 #     groebner_with_finished.reset_index(),

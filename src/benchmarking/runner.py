@@ -22,6 +22,10 @@ _samply_script_format = r"""\
 set -euo pipefail
 samply record --save-only --reuse-threads --profile-name {output} --rate 500 -o {output} -- {venv}/bin/python {python_flags} {script}"""
 
+_sagemath_script_format = r"""\
+set -euo pipefail
+sage --python {python_flags} {script}"""
+
 _external_run_config_format = """\
 Running {lib}."""
 
@@ -61,10 +65,11 @@ class Runner(abc.ABC):
         "text": True,
     }
 
-    def __init__(self, library: str, flags: list[str], verbose, output_dir):
+    def __init__(self, library: str, flags: list[str], verbose, output_dir, timeout: int):
         assert library in self.libraries
         self.library = library
         self.env = os.environ | self.libraries[library]["env"]
+        self.timeout = timeout
 
         if flags is None:
             flags = []
@@ -97,6 +102,7 @@ class PythonRunner(Runner):
     libraries = harnesses["python"]
     run_config_format = _python_run_config_format
     report_format = _report_format
+    script_format = _script_format
 
     def __init__(
         self,
@@ -111,8 +117,9 @@ class PythonRunner(Runner):
         output_dir: pathlib.Path,
         flags: list[str] = None,
         verbose: bool = False,
+        timeout: int = 30,
     ):
-        super().__init__(library, flags, verbose, output_dir)
+        super().__init__(library, flags, verbose, output_dir, timeout)
 
         self.venv = virtual_env
         self.type = type
@@ -127,7 +134,7 @@ class PythonRunner(Runner):
             )
         else:
             self.profile_file = None
-            self.script = _script_format.format(
+            self.script = self.script_format.format(
                 venv=virtual_env, python_flags=" ".join(self.flags), script=self.libraries[library]["file"]
             )
 
@@ -138,6 +145,7 @@ class PythonRunner(Runner):
             "gc": gc,
             "repeats": repeats,
             "log_file": self.log_file.name if self.log_file is not None else None,
+            "timeout": self.timeout,
         }
 
     def start(self):
@@ -192,10 +200,13 @@ class PythonRunner(Runner):
         }
 
 
-class MathematicaRunner(Runner):
-    libraries = harnesses["external"]
-    run_config_format = _external_run_config_format
-    report_format = _report_format
+class SageMathRunner(PythonRunner):
+    libraries = harnesses["sagemath"]
+    script_format = _sagemath_script_format
+
+
+class MathematicaRunner(SageMathRunner):
+    libraries = harnesses["mathematica"]
 
 
 @dataclass
@@ -207,6 +218,7 @@ class RunSpec:
     run_list: list[str]
     polys: dict
     output_dir: pathlib.Path
+    timeout: int
 
     def run(self):
         self.processes = [x.run() for x in self.runners]
@@ -252,6 +264,7 @@ class PythonRunSpec(RunSpec):
                 verbose=self.verbose,
                 flags=self.flags,
                 output_dir=self.output_dir,
+                timeout=self.timeout,
             )
             for lib, venv, gc, type in itertools.product(self.libs, self.venvs, self.gc, types)
         ]
@@ -267,4 +280,38 @@ class ExternalRunSpec(RunSpec):
             if self.libs
             else "Running with no external libraries."
         )
+
         self.runners = []
+        for lib in self.libs:
+            if lib == "sagemath":
+                self.runners.append(
+                    SageMathRunner(
+                        virtual_env=None,
+                        library=lib,
+                        run_list=self.run_list,
+                        type="benchmark",
+                        polys=self.polys,
+                        gc=None,
+                        repeats=self.repeats,
+                        verbose=self.verbose,
+                        flags=None,
+                        output_dir=self.output_dir,
+                        timeout=self.timeout,
+                    )
+                )
+            elif lib == "mathematica":
+                self.runners.append(
+                    MathematicaRunner(
+                        virtual_env=None,
+                        library=lib,
+                        run_list=self.run_list,
+                        type="benchmark",
+                        polys=self.polys,
+                        gc=None,
+                        repeats=self.repeats,
+                        verbose=self.verbose,
+                        flags=None,
+                        output_dir=self.output_dir,
+                        timeout=self.timeout,
+                    )
+                )
