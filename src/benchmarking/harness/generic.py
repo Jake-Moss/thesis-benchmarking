@@ -53,7 +53,6 @@ class Executor:
             p = mp.Process(target=self.run, args=(func, self.setup, self.repeats, q))
             p.start()
             self.results[name] = q.get(timeout=self.timeout)
-            self.results[name] = self.run(func, self.setup, self.repeats, q)
         except queue.Empty:
             self.results[name] = [float("inf")]
             logger.error(f"timed out on {name} after {self.timeout}s")

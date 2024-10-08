@@ -233,6 +233,7 @@ def main():
                         logger.error(f"{proc.library} exited with code {proc.process.returncode}")
                     running.remove(proc)
                     completed.append(proc)
+                    logger.info(f"{len(completed)}/{len(todo) + len(running) + len(completed)} completed. Currently running: {len(running)}")
                     break
 
     except KeyboardInterrupt as e:
