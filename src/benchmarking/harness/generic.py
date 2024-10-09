@@ -50,7 +50,7 @@ class Executor:
     def execute(self, name, func):
         q = mp.Queue()
         try:
-            p = mp.Process(target=self.run, args=(func, self.setup, self.repeats, q))
+            p = mp.Process(target=self.run, args=(func, self.setup, self.repeats, q), daemon=True)
             p.start()
             self.results[name] = q.get(timeout=self.timeout)
         except queue.Empty:
@@ -77,7 +77,7 @@ class MemrayExecutor(Executor):
 
         with tempfile.NamedTemporaryFile(suffix=".bin") as file:
             try:
-                p = mp.Process(target=self.run, args=(func, self.setup, self.repeats, q, file.name))
+                p = mp.Process(target=self.run, args=(func, self.setup, self.repeats, q, file.name), daemon=True)
                 p.start()
                 q.get(timeout=self.timeout)
             except queue.Empty:

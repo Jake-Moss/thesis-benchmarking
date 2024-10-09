@@ -21,7 +21,7 @@ if test ! -d $PYTHON313_VENV; then
     pip install --config-settings=setup-args="-Dflint_version_check=false" ./libs/python-flint/
     pip install ./libs/sympy/
     pip install gmpy2==2.2.1
-    pip install ./libs/memray-1.13.4-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+    pip install memray
     pip install -e .
     deactivate
     fix-python --venv $PYTHON313_VENV

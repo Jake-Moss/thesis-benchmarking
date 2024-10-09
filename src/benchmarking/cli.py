@@ -215,7 +215,7 @@ def main():
     try:
         cores = min(args.cores, len(todo))
         while todo or running:
-            if cores > 0 and todo:
+            if cores > 0 and todo and not something_broke:
                 cores = cores - 1
                 proc = todo.pop()
                 proc.start()
@@ -238,7 +238,7 @@ def main():
 
     except KeyboardInterrupt as e:
         for proc in running:
-            proc.process.kill()
+            proc.process.terminate()
         raise e
 
     if not something_broke:

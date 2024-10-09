@@ -178,7 +178,7 @@ class PythonRunner(Runner):
         with open(self.results_file.name, "rb") as f:
             self.results = pickle.load(f)
 
-        if self.profile_file is not None and self.stdout is not None:
+        if self.profile_file is not None and self.results is not None:
             self.results["profile_file"] = self.profile_file.name
 
         logger.info(f"{self.library} {self.type} process finished")

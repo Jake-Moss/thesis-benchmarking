@@ -19,10 +19,12 @@ class SymPy(Library):
             self.__parse_polys_dmp(polys_collection)
             self.leading_coefficient = self.__leading_coefficient_dmp
             self.groebner = self.__groebner_dmp
+            self.divmod = self.__divmod_dmp
         else:
             self.__parse_polys_domains(polys_collection)
             self.leading_coefficient = self.__leading_coefficient_domains
             self.groebner = self.__groebner_domains
+            self.divmod = self.__divmod_domains
 
     def __parse_polys_dmp(self, polys_collection: dict):
         for k, (gens, polys) in polys_collection.items():
@@ -72,11 +74,18 @@ class SymPy(Library):
             p1 * p2
 
     @staticmethod
-    def divmod(s1, s2):
+    def __divmod_dmp(s1, s2):
         (gens, p1s) = s1
         (_, p2s) = s2
         for p1, p2 in zip(p1s, p2s):
             sympy.polys.polytools.pdiv(p1, p1)
+
+    @staticmethod
+    def __divmod_domains(s1, s2):
+        (gens, p1s) = s1
+        (_, p2s) = s2
+        for p1, p2 in zip(p1s, p2s):
+            p1.pdiv(p1)
 
     @staticmethod
     def factor(s):
