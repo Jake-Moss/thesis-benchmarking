@@ -36,7 +36,7 @@ class SymPy(Library):
                 else:
                     poly = [sympy.Poly.from_dict(p, gens=gens) for p in poly]
                 res.append(poly)
-            self.poly_dict[k] = (gens, res)
+            self.poly_dict[k] = res
 
     def __parse_polys_domains(self, polys_collection: dict):
         for k, (gens, polys) in polys_collection.items():
@@ -50,84 +50,70 @@ class SymPy(Library):
                 else:
                     poly = [R.from_sympy(sympy.Poly.from_dict(p, gens=gens).as_expr()) for p in poly]
                 res.append(poly)
-            self.poly_dict[k] = (gens, res)
+            self.poly_dict[k] = res
 
     @staticmethod
-    def add(s1, s2):
-        (_, p1s) = s1
-        (_, p2s) = s2
-        for p1, p2 in zip(p1s, p2s):
+    def add(ps1, ps2):
+        for p1, p2 in zip(ps1, ps2):
             p1 + p2
 
     @staticmethod
-    def sub(s1, s2):
-        (_, p1s) = s1
-        (_, p2s) = s2
-        for p1, p2 in zip(p1s, p2s):
+    def sub(ps1, ps2):
+        for p1, p2 in zip(ps1, ps2):
             p1 - p2
 
     @staticmethod
-    def mult(s1, s2):
-        (_, p1s) = s1
-        (_, p2s) = s2
-        for p1, p2 in zip(p1s, p2s):
+    def mult(ps1, ps2):
+        for p1, p2 in zip(ps1, ps2):
             p1 * p2
 
     @staticmethod
-    def __divmod_dmp(s1, s2):
-        (gens, p1s) = s1
-        (_, p2s) = s2
-        for p1, p2 in zip(p1s, p2s):
-            sympy.polys.polytools.pdiv(p1, p1)
+    def __divmod_dmp(ps1, ps2):
+        for p1, p2 in zip(ps1, ps2):
+            sympy.polys.polytools.pdiv(p1, p2)
 
     @staticmethod
-    def __divmod_domains(s1, s2):
-        (gens, p1s) = s1
-        (_, p2s) = s2
-        for p1, p2 in zip(p1s, p2s):
-            p1.pdiv(p1)
+    def __divmod_domains(ps1, ps2):
+        for p1, p2 in zip(ps1, ps2):
+            p1.pdiv(p2)
 
     @staticmethod
-    def factor(s):
-        (_, p) = s
+    def resultant(ps1, ps2):
+        for p1, p2 in zip(ps1, ps2):
+            p1.resultant(p2)
+
+    @staticmethod
+    def factor(p):
         for p1 in p:
             p1.factor_list()
 
     @staticmethod
-    def gcd(s1, s2):
-        (_, p1s) = s1
-        (_, p2s) = s2
-        for p1, p2 in zip(p1s, p2s):
+    def gcd(ps1, ps2):
+        for p1, p2 in zip(ps1, ps2):
             p1.gcd(p2)
 
     @staticmethod
-    def lcm(s1, s2):
-        (_, p1s) = s1
-        (_, p2s) = s2
-        for p1, p2 in zip(p1s, p2s):
+    def lcm(ps1, ps2):
+        for p1, p2 in zip(ps1, ps2):
             p1.lcm(p2)
 
     @staticmethod
-    def __leading_coefficient_dmp(s):
-        _, p = s
+    def __leading_coefficient_dmp(p):
         for p1 in p:
             p1.LC()
 
     @staticmethod
-    def __leading_coefficient_domains(s):
-        _, p = s
+    def __leading_coefficient_domains(p):
         for p1 in p:
             p1.LC
 
     @staticmethod
     def __groebner_dmp(system):
-        gens, p = system
-        return sympy.polys.polytools.groebner(p, *gens)
+        raise NotImplementedError("don't use this one")
 
     @staticmethod
     def __groebner_domains(system):
-        _, p = system
-        return sympy.polys.groebnertools.groebner(p, p[0].ring)
+        return sympy.polys.groebnertools.groebner(system, system[0].ring)
 
     # @staticmethod
     # def groebner_f5b(system):

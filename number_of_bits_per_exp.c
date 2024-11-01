@@ -3,8 +3,8 @@
 #include "flint/mpoly.h"
 #include <stdio.h>
 
-#define ITERATIONS 62 * 2
-#define GENS 3
+#define ITERATIONS 62 * 4
+#define GENS 111111
 
 void number_of_bits(void) {
   unsigned long long cycle_start, cycle_end;
@@ -20,27 +20,30 @@ void number_of_bits(void) {
   fmpz_mpoly_init(x, ctx);
   fmpz_mpoly_gen(x, 0, ctx);
   ulong res[ITERATIONS] = {0};
+  ulong res2[ITERATIONS] = {0};
 
   for (int i = 0; i < ITERATIONS; i++) {
-    fmpz_mpoly_print_pretty(x, vars, ctx);
-    flint_printf("\n");
+    /* fmpz_mpoly_print_pretty(x, vars, ctx); */
+    /* flint_printf("\n"); */
     if (!fmpz_mpoly_pow_ui(x, x, 2, ctx)) {
       flint_printf("unreasonably large polynomial: ");
       break;
     }
 
     res[i] = x->bits;
-    if (i > 1 && res[i - 1] != res[i]) {
-        flint_printf("bits changed\n");
-    }
+    res2[i] = x->alloc;
+    /* if (i > 1 && res[i - 1] != res[i]) { */
+    /*     flint_printf("bits changed\n"); */
+    /* } */
   }
 
-  printf("[");
-  for (int i = 0; i < ITERATIONS - 1; i++) {
-    printf("%lu, ", res[i]);
+  printf("[%lu, ", res[0]);
+  for (int i = 1; i < ITERATIONS; i++) {
+    if (res[i - 1] != res[i]) {
+        printf("%lu, ", res[i]);
+    }
   }
-  printf("%lu]\n", res[ITERATIONS - 1]);
-  flint_printf("\n");
+  printf("]\n");
 }
 
 int main(void) {

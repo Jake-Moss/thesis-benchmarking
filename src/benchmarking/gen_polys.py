@@ -23,6 +23,7 @@ class PolynomialGenerator:
         terms: list[range],
         coefficients: list[range],
         exponents: list[range],
+        groupby: list[str],
         number: int,
         seed: int,
     ):
@@ -32,6 +33,9 @@ class PolynomialGenerator:
         self.exponents = exponents
         self.number = number
         self.rng = random.Random(seed)
+
+        keys = ["gens", "terms", "exp_range", "coeff_range"]
+        self.groupby = tuple(keys.index(x) for x in groupby)
 
     def generate(self):
         self.results = {}
@@ -74,7 +78,7 @@ class PolynomialGenerator:
 
             groups = defaultdict(list)
             for key in res.keys():
-                groups[key[0]].append(key)
+                groups[tuple(key[i] for i in self.groupby)].append(key)
 
             self.singles.extend((x,) for x in res.keys())
             self.combos.extend(
@@ -88,10 +92,11 @@ class PolynomialGenerator:
 
         self.run_list = {
             "add": self.combos,
-            "sub": self.combos,
+            # "sub": self.combos,
             "mult": self.combos,
             "divmod": self.combos,
-            "factor": self.singles,
+            "resultant": self.combos,
+            # "factor": self.singles,
             "gcd": self.combos,
             # "lcm": self.combos,
             "leading_coefficient": self.singles,

@@ -39,6 +39,11 @@ class PythonFlint(Library):
             divmod(p1, p2)
 
     @staticmethod
+    def resultant(p1s, p2s):
+        for p1, p2 in zip(p1s, p2s):
+            p1.resultant(p2, 0)
+
+    @staticmethod
     def factor(p):
         for p1 in p:
             p1.factor()
@@ -58,7 +63,6 @@ class PythonFlint(Library):
         for p1 in p:
             p1.leading_coefficient()
 
-    @staticmethod
     @staticmethod
     def groebner(p):
         p.buchberger_naive().autoreduction()

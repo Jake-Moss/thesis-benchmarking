@@ -7,6 +7,7 @@ import functools
 import queue
 import tempfile
 import fileinput
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -158,13 +159,28 @@ class Library(abc.ABC):
     def __init__(self, profiler: dict):
         self.profiler = profiler
         self.poly_dict = {}
+        self.additional_dict = {}
 
     def run(self, run_list):
         self.results = {}
         for name, poly_keys in run_list.items():
             for poly_key in poly_keys:
                 args = tuple(self.poly_dict[k] for k in poly_key)
+
                 logger.debug(f"running {type(self.profiler).__name__} on {name} with arguments {poly_key}")
+                # Scramble the order of the polynomials
+                new_args = [list(x) for x in args]
+                random.seed(0)
+                for arg in new_args:
+                    random.shuffle(arg)
+
+                for i in range(len(new_args)):
+                    if isinstance(args[i], (list, tuple)):
+                        pass
+                    else:
+                        new_args[i] = args[i].__class__(new_args[i], args[i][0].context())
+
+                args = tuple(new_args)
 
                 func = getattr(self, name)
                 foo = functools.partial(func, *args)

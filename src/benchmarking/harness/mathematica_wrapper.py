@@ -58,6 +58,13 @@ class Mathematica(Library):
             p1.myPolynomialReduce([p2])
 
     @staticmethod
+    def resultant(s1, s2):
+        (gens, p1s) = s1
+        (_, p2s) = s2
+        for p1, p2 in zip(p1s, p2s):
+            p1.Resultant(p2, gens[1])  # Mathematica is 1-indexed
+
+    @staticmethod
     def factor(s):
         (_, p) = s
         for p1 in p:

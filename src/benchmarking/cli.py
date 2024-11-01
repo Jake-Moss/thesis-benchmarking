@@ -181,7 +181,7 @@ def main():
         libs=python_libs,
         venvs=venvs,
         benchmark=args.benchmark,
-        repeats=3,
+        repeats=args.repeats,
         cpu=args.cpu,
         mem=args.mem,
         run_list=run_list,
@@ -196,7 +196,7 @@ def main():
         verbose=args.verbose,
         libs=external_libs,
         benchmark=args.benchmark,
-        repeats=3,
+        repeats=args.repeats,
         run_list=run_list,
         polys=polys,
         output_dir=output,
@@ -351,6 +351,15 @@ def gen_polys():
     )
 
     parser.add_argument(
+        "--groupby",
+        dest="groupby",
+        type=str,
+        default=["gens", "terms"],
+        nargs="+",
+        help="polynomial key attributes to group the run_list by",
+    )
+
+    parser.add_argument(
         "--describe",
         dest="describe",
         action="store_true",
@@ -394,6 +403,7 @@ def gen_polys():
             terms=args.terms,
             coefficients=args.coefficients,
             exponents=args.exponents,
+            groupby=args.groupby,
             number=args.number,
             seed=args.seed,
         )

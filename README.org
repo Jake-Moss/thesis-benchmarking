@@ -2,7 +2,7 @@
 This library is a bespoke automated and parallelised benchmarking framework to do memory profiling (native and python allocations via [[https://github.com/bloomberg/memray][memray]]), CPU profiling (via [[https://github.com/mstange/samply][samply]]) across [[https://github.com/sympy/sympy][SymPy]] and [[https://github.com/flintlib/python-flint][python-flint]], and benchmarking across =SymPy=, =python-flint=, [[https://www.sagemath.org/][SageMath]], and [[https://www.wolfram.com/mathematica/][Mathematica]]. Including all the different =SymPy= ground types (=python=, =flint=, and =gmpy=), as well as the two different =SymPy= multivariate polynomial implementations (=DMP= and =PolyElement=). It supports early termination of long running functions across all libraries[fn:1].
 
 * Architecture
-This is not intended to be used outside of these benchmarks, nor is it intended to be used by anyone, but I'll aim to somewhat document how this works and the troubles I ran time.
+This is not intended to be used outside of these benchmarks, nor is it intended to be used by anyone, but I'll aim to somewhat document how this works and the troubles I ran into.
 
 ** Premise
 I wanted an automated, and parallelised way to run both standard benchmarks, and profiling on a dataset and functions. Due to the nature of how this work I needed a rather custom solution. The library needed to support defining common functions and a uniform method of data input. It also needed to support early termination for long running C functions /outside/ of the CPython interpreter (more on this below).
@@ -101,56 +101,60 @@ The cross product of all arguments are is taken. Be careful.
 #+begin_src shell :results verbatim :export both
   python -c "from src.benchmarking.cli import *; gen_polys()" \
      ./ \
-     --generators   "1-5, 6-13:2" \
+     --generators   "2-17:2" \
      --terms        "10" \
-     --coefficients "1-1000" \
-     --exponents    "0-1000" \
-     --number 1 \
-     --seed 12 2> /dev/null && \
+     --coefficients "0-100" \
+     --exponents    "0-10" \
+     --groupby gens terms \
+     --number 10 \
+     --seed 123 2> /dev/null && \
   python -c "from src.benchmarking.cli import *; gen_polys()" \
      ./ \
-     --generators   "1-5, 6-13:2" \
-     --terms        "10" \
-     --coefficients "2**65-2**66" \
-     --exponents    "0-1000" \
-     --number 1 \
-     --seed 34 \
+     --generators   "3" \
+     --terms        "4-33:4" \
+     --coefficients "0-100" \
+     --exponents    "0-10" \
+     --number 10 \
+     --groupby gens terms \
+     --seed 987 \
      --append 2> /dev/null && \
   python -c "from src.benchmarking.cli import *; gen_polys()" \
      ./ \
-     --generators   "5" \
-     --terms        "4-33:4" \
-     --coefficients "1-1000" \
-     --exponents    "0-1000" \
-     --number 1 \
-     --seed 45 \
+     --generators   "2-17:2" \
+     --terms        "10" \
+     --coefficients "0-100" \
+     --exponents    "0-100" \
+     --groupby gens terms \
+     --number 10 \
+     --seed 246 \
      --append 2> /dev/null && \
   python -c "from src.benchmarking.cli import *; gen_polys()" \
      ./ \
-     --generators   "5" \
+     --generators   "3" \
      --terms        "4-33:4" \
-     --coefficients "2**65-2**66" \
-     --exponents    "0-1000" \
-     --number 1 \
-     --seed 67 \
+     --coefficients "0-100" \
+     --exponents    "0-100" \
+     --number 10 \
+     --groupby gens terms \
+     --seed 357 \
      --append 2> /dev/null && \
   python -c "from src.benchmarking.cli import *; gen_polys()" ./polys.pickle --describe
 #+end_src
 
 #+RESULTS:
 #+begin_example
-    generators  terms     exp_range          coeff_range                 gens                 poly
-0            1     10  (0, 1000, 1)         (1, 1000, 1)                 [x0]  {(485,): 276, (6...
-1            2     10  (0, 1000, 1)         (1, 1000, 1)             [x0, x1]  {(1, 677): 640, ...
-2            3     10  (0, 1000, 1)         (1, 1000, 1)         [x0, x1, x2]  {(521, 228, 93):...
-3            4     10  (0, 1000, 1)         (1, 1000, 1)     [x0, x1, x2, x3]  {(990, 196, 999,...
-4            6     10  (0, 1000, 1)         (1, 1000, 1)  [x0, x1, x2, x3,...  {(37, 443, 283, ...
-..         ...    ...           ...                  ...                  ...                  ...
-27           5     16  (0, 1000, 1)  (368934881474191...  [x0, x1, x2, x3,...  {(956, 486, 317,...
-28           5     20  (0, 1000, 1)  (368934881474191...  [x0, x1, x2, x3,...  {(793, 787, 942,...
-29           5     24  (0, 1000, 1)  (368934881474191...  [x0, x1, x2, x3,...  {(843, 288, 152,...
-30           5     28  (0, 1000, 1)  (368934881474191...  [x0, x1, x2, x3,...  {(434, 762, 414,...
-31           5     32  (0, 1000, 1)  (368934881474191...  [x0, x1, x2, x3,...  {(192, 382, 783,...
+     generators  terms    exp_range  coeff_range          gens                 poly
+0             2     10   (0, 10, 1)  (0, 100, 1)      [x0, x1]  {(0, 4): 11, (6,...
+1             2     10   (0, 10, 1)  (0, 100, 1)      [x0, x1]  {(0, 1): 85, (2,...
+2             2     10   (0, 10, 1)  (0, 100, 1)      [x0, x1]  {(8, 6): 47, (8,...
+3             2     10   (0, 10, 1)  (0, 100, 1)      [x0, x1]  {(8, 0): 81, (4,...
+4             2     10   (0, 10, 1)  (0, 100, 1)      [x0, x1]  {(9, 1): 65, (5,...
+..          ...    ...          ...          ...           ...                  ...
+315           3     32  (0, 100, 1)  (0, 100, 1)  [x0, x1, x2]  {(88, 28, 37): 8...
+316           3     32  (0, 100, 1)  (0, 100, 1)  [x0, x1, x2]  {(55, 71, 0): 44...
+317           3     32  (0, 100, 1)  (0, 100, 1)  [x0, x1, x2]  {(93, 16, 36): 2...
+318           3     32  (0, 100, 1)  (0, 100, 1)  [x0, x1, x2]  {(92, 62, 99): 3...
+319           3     32  (0, 100, 1)  (0, 100, 1)  [x0, x1, x2]  {(59, 46, 82): 4...
 #+end_example
 
 * Footnotes
