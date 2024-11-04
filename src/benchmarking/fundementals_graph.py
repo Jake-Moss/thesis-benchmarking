@@ -15,11 +15,10 @@ sns.set_theme("notebook", font_scale=1, rc={
     # "text.usetex": True,
     # "text.latex.preamble": r"\usepackage{libertine}",
     'font.family': 'serif',
-    'font.serif': ['Computer Modern'],
 })
 cmap = colormaps["inferno_r"]
 
-f = pathlib.Path("results/results_2024-11-01_12-08-31")
+f = pathlib.Path("results/results_2024-11-01_16-07-14")
 
 
 bench_df, _, _ = load_python_results(f / "results.pickle")
@@ -68,7 +67,8 @@ fixed_terms = pd.concat([
     binary_functions[binary_functions["Terms"] == 10]
 ]).drop(columns="Terms").reset_index(drop=True).sort_values(by=["library", "function", "Generators"])
 
-
+fixed_gens = pd.concat([fixed_gens[(fixed_gens["library"] != "mathematica")], fixed_gens[(fixed_gens["library"] == "mathematica")]])
+fixed_terms = pd.concat([fixed_terms[(fixed_terms["library"] != "mathematica")], fixed_terms[(fixed_terms["library"] == "mathematica")]])
 
 # sns_kwargs = {
 #     "x": "Terms",
@@ -187,7 +187,10 @@ def make_big_plot(df, x_col, title, layout, size, header=True):
         df1 = gb1.get_group(col)
         df2 = gb2.get_group(col)
 
-        gs00 = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs[header + i, j], wspace=0.2)
+        df1 = pd.concat([df1[(df1["library"] != "mathematica")], df1[(df1["library"] == "mathematica")]])
+        df2 = pd.concat([df2[(df2["library"] != "mathematica")], df2[(df2["library"] == "mathematica")]])
+
+        gs00 = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs[header + i, j], hspace=0.6, wspace=0.2)
 
         rot = 0
         # Scatter plot
@@ -198,9 +201,15 @@ def make_big_plot(df, x_col, title, layout, size, header=True):
         ax_scatter.set_box_aspect(1)
         legend = ax_scatter.get_legend()
 
+        pivot = df2.pivot(index="library", columns=x_col, values="timings")
+        try:
+            pivot = pd.concat([pivot.drop("mathematica"), pivot.loc[["mathematica"]]])
+        except KeyError:
+            pass
+
         ax_heatmap = fig.add_subplot(gs00[1])
         sns.heatmap(
-            df2.pivot(index="library", columns=x_col, values="timings"),
+            pivot,
             ax=ax_heatmap,
             cbar=False,
             cmap=cmap,
@@ -215,7 +224,7 @@ def make_big_plot(df, x_col, title, layout, size, header=True):
         ax.axis('off')
         ax.set_title(name, pad=10.0, fontsize="large")
 
-        ax_scatter.set_xticks(df1[x_col].unique(), ax_heatmap.get_xticklabels())
+        ax_scatter.set_xticks(df1[x_col].unique()[:len(ax_heatmap.get_xticklabels())], ax_heatmap.get_xticklabels())
 
         new_legend = Legend(
             ax_heatmap,
@@ -276,7 +285,7 @@ poster_layout = {
 
 # layout = {
 #     'add': (0, 0, "Addition"),
-#     'leading_coefficient': (1, 0, "Leading coefficient"),
+#     'leading_coefficient': (1, 0, "Leading coefficienft"),
 # }
 
 
@@ -316,13 +325,12 @@ poster_layout = {
 
 
 
-
 fig = make_big_plot(
     fixed_gens[fixed_gens["exp"] == "Small exponent"],
     "Terms",
-    "Minimum absolute and relative time for fundamental operations with 5 generators",
+    "Minimum absolute and relative time for fundamental operations\nwith 3 generators and small exponents",
     layout,
-    (11, 10),
+    (11, 13),
 )
 fig.savefig('images/fundamentals_fixed_gens_full_small.pdf', dpi=300, bbox_inches='tight')
 fig.show()
@@ -330,9 +338,9 @@ fig.show()
 fig = make_big_plot(
     fixed_terms[fixed_gens["exp"] == "Small exponent"],
     "Generators",
-    "Minimum absolute and relative time for fundamental operations with 10 terms",
+    "Minimum absolute and relative time for fundamental operations\nwith 10 terms and small exponents",
     layout,
-    (11, 10),
+    (11, 13),
 )
 fig.savefig('images/fundamentals_fixed_terms_full_small.pdf', dpi=300, bbox_inches='tight')
 fig.show()
@@ -343,9 +351,9 @@ fig.show()
 fig = make_big_plot(
     fixed_gens[fixed_gens["exp"] != "Small exponent"],
     "Terms",
-    "Minimum absolute and relative time for fundamental operations with 5 generators",
+    "Minimum absolute and relative time for fundamental operations\nwith 3 generators and large exponents",
     layout,
-    (11, 10),
+    (11, 13),
 )
 fig.savefig('images/fundamentals_fixed_gens_full_large.pdf', dpi=300, bbox_inches='tight')
 fig.show()
@@ -353,9 +361,109 @@ fig.show()
 fig = make_big_plot(
     fixed_terms[fixed_gens["exp"] != "Small exponent"],
     "Generators",
-    "Minimum absolute and relative time for fundamental operations with 10 terms",
+    "Minimum absolute and relative time for fundamental operations\nwith 10 terms and large exponents",
     layout,
-    (11, 10),
+    (11, 13),
 )
 fig.savefig('images/fundamentals_fixed_terms_full_large.pdf', dpi=300, bbox_inches='tight')
 fig.show()
+
+
+
+
+
+
+
+fig = make_big_plot(
+    fixed_gens[(fixed_gens["exp"] == "Small exponent") & (fixed_gens["library"] != "mathematica")],
+    "Terms",
+    "Minimum absolute and relative time for fundamental operations\nwith 3 generators and small exponents, sans Mathematica",
+    layout,
+    (11, 13),
+)
+fig.savefig('images/fundamentals_fixed_gens_full_small_sans_mathematica.pdf', dpi=300, bbox_inches='tight')
+fig.show()
+
+fig = make_big_plot(
+    fixed_terms[(fixed_terms["exp"] == "Small exponent") & (fixed_terms["library"] != "mathematica")],
+    "Generators",
+    "Minimum absolute and relative time for fundamental operations\nwith 10 terms and small exponents, sans Mathematica",
+    layout,
+    (11, 13),
+)
+fig.savefig('images/fundamentals_fixed_terms_full_small_sans_mathematica.pdf', dpi=300, bbox_inches='tight')
+fig.show()
+
+
+
+
+fig = make_big_plot(
+    fixed_gens[(fixed_gens["exp"] != "Small exponent") & (fixed_gens["library"] != "mathematica")],
+    "Terms",
+    "Minimum absolute and relative time for fundamental operations\nwith 3 generators and large exponents, sans Mathematica",
+    {k: layout[k] for k in (layout.keys() - {"resultant"})},
+    (11, 13),
+)
+fig.savefig('images/fundamentals_fixed_gens_full_large_sans_mathematica.pdf', dpi=300, bbox_inches='tight')
+fig.show()
+
+fig = make_big_plot(
+    fixed_terms[(fixed_terms["exp"] != "Small exponent") & (fixed_terms["library"] != "mathematica")],
+    "Generators",
+    "Minimum absolute and relative time for fundamental operations\nwith 10 terms and large exponents, sans Mathematica",
+    {k: layout[k] for k in (layout.keys() - {"resultant"})},
+    (11, 13),
+)
+fig.savefig('images/fundamentals_fixed_terms_full_large_sans_mathematica.pdf', dpi=300, bbox_inches='tight')
+fig.show()
+
+
+
+
+
+
+
+
+
+
+raise Exception()
+
+_, _, mem_df = load_python_results("results/results_2024-11-01_16-21-38/results.pickle")
+
+##  Memory graphs
+
+# mem_df["usage"] = mem_df["usage"].apply(lambda x: pd.DataFrame(x, columns=["function", "file", "total", "% total", "own", "% own", "allocations"]))
+# mem_df["allocations"] = mem_df["usage"].apply(lambda x: x["allocations"].max())
+
+mem = mem_df.copy().loc[mem_df["function"].apply(lambda x: x[0]).index]
+mem["args"] = mem["function"].apply(lambda x: x[1][0]).astype("category")
+mem["function"] = mem["function"].apply(lambda x: x[0]).astype("category")
+
+mem["exp"] = mem.args.apply(lambda args: exp_map[args[2]])
+mem = mem.drop(columns=["args", "gc", "venv"])
+
+
+
+res = []
+gb = mem.drop(columns="max_allocations").groupby(by=["function"], observed=True)
+for (k, df), m in zip(gb, gb.max(numeric_only=True).dropna()["max_bytes"].values):
+    df["max_bytes"] /= m
+    res.append(df)
+
+bytes_normalised = pd.concat(res)
+del res
+
+
+res = []
+gb = mem.drop(columns="max_bytes").groupby(by=["function"], observed=True)
+for (k, df), m in zip(gb, gb.max(numeric_only=True).dropna()["max_allocations"].values):
+    df["max_allocations"] /= m
+    res.append(df)
+
+allocs_normalised = pd.concat(res)
+del res
+
+
+
+max_bytes = bytes_normalised.pivot(index="library", columns="function", values="max_bytes")
+max_allocs = allocs_normalised.pivot(index="library", columns="function", values="max_allocations")

@@ -68,7 +68,7 @@ class SageMath(Library):
     @staticmethod
     def groebner(p):
         I = ideal(p)
-        I.groebner_basis()
+        I.groebner_basis(algorithm="singular:std")
 
 
 if __name__ == "__main__":

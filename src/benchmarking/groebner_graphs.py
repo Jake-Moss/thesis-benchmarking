@@ -16,7 +16,6 @@ sns.set_theme("notebook", font_scale=1, rc={
     # "text.latex.preamble": r"\usepackage{libertine}",
     # "text.latex.preamble": "",
     'font.family': 'serif',
-    'font.serif': ['Computer Modern'],
 })
 
 cmap = colormaps["inferno_r"]
@@ -29,7 +28,8 @@ with open("polynomial_db/polys_df.pickle", "rb") as f:
 polys.index = polys.index.astype("category")
 
 # bench_df, cpu_df, mem_df = load_python_results("results/results_2024-10-09_11-16-51/results.pickle")
-bench_df, cpu_df, mem_df = load_python_results("results/results_2024-11-01_11-53-13/results.pickle")
+# bench_df, cpu_df, mem_df = load_python_results("results/results_2024-11-01_11-53-13/results.pickle")
+bench_df, cpu_df, mem_df = load_python_results("results/results_2024-11-02_21-42-02/results.pickle")
 
 # external_groebner = load_external_results("results/results_2024-10-09_11-16-51/results.pickle")
 external_groebner = load_external_results("results/results_2024-11-01_11-53-13/results.pickle")
@@ -67,7 +67,7 @@ external_groebner = external_groebner_with_finished.drop(columns=["dnf"]).set_in
 merged_groebner = pd.concat([groebner.reset_index(), external_groebner.reset_index()], axis=0).set_index(groebner.index.names)
 merged_groebner = merged_groebner.groupby(by=["system", "library"], observed=True).min()
 
-merged_groebner = merged_groebner.reset_index()[merged_groebner.reset_index()["library"] != "mathematica"].set_index(["system", "library"]).sort_index()
+# merged_groebner = merged_groebner.reset_index()[merged_groebner.reset_index()["library"] != "mathematica"].set_index(["system", "library"]).sort_index()
 
 
 order = (
@@ -201,11 +201,13 @@ sns_kwargs = {
 # plt.tight_layout()
 # plt.show()
 
+pivot = (merged_pivot / merged_max)
+pivot = pd.concat([pivot.drop("mathematica"), pivot.loc[["mathematica"]]])
 
 fig = plt.figure(figsize=(8, 3))
 ax = fig.add_subplot()
 sns.heatmap(
-    merged_pivot / merged_max,
+    pivot,
     # annot=max_labels,
     fmt="",
     vmin=0,

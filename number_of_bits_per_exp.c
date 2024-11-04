@@ -3,8 +3,8 @@
 #include "flint/mpoly.h"
 #include <stdio.h>
 
-#define ITERATIONS 62 * 4
-#define GENS 111111
+#define ITERATIONS 62 * 2
+#define GENS 5
 
 void number_of_bits(void) {
   unsigned long long cycle_start, cycle_end;
@@ -44,6 +44,18 @@ void number_of_bits(void) {
     }
   }
   printf("]\n");
+
+  printf("[");
+  for (int i = 0; i < FLINT_BITS; i++) {
+      printf("%ld, ", ctx->minfo->lut_words_per_exp[i]);
+  }
+  printf("%ld]\n", ctx->minfo->lut_words_per_exp[FLINT_BITS - 1]);
+
+  printf("[");
+  for (int i = 0; i < FLINT_BITS; i++) {
+      printf("%u, ", ctx->minfo->lut_fix_bits[i]);
+  }
+  printf("%u]\n", ctx->minfo->lut_fix_bits[FLINT_BITS - 1]);
 }
 
 int main(void) {

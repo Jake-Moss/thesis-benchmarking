@@ -13,7 +13,7 @@ class Mathematica(Library):
     @classmethod
     def main(cls):
         mathematica("myPolynomialReduce[args___] := PolynomialReduce[args, CoefficientDomain -> Integers]")
-        mathematica("myGroebnerBasis[args___] := GroebnerBasis[args, CoefficientDomain -> Integers]")
+        mathematica("myGroebnerBasis[args___] := GroebnerBasis[args, CoefficientDomain -> Integers, Method -> \"Buchberger\"]")
         super().main(Executor_cls=MathematicaExecutor)
 
     def parse_polys(self, polys_collection: dict):
